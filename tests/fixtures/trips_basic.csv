@@ -1,0 +1,6 @@
+city_name,product_type_name,currency_code,request_timestamp_local,begintrip_timestamp_local,dropoff_timestamp_local,begintrip_string,destination_string,trip_distance_miles,trip_duration_seconds,status,original_fare_local,extra_unused_column
+Paris,Green,EUR,2023-05-01 08:10:00,2023-05-01 08:15:00,2023-05-01 08:35:00,1 rue A,2 rue B,10,1200,completed,25.50,foo
+Paris,GREEN,EUR,2023-05-02 09:00:00,2023-05-02 09:05:00,2023-05-02 09:20:00,3 rue C,4 rue D,5,900,completed,"12,40",bar
+Lausanne,uberX,CHF,2024-01-07 23:30:00,,,,,,,rider_canceled,,baz
+Lausanne,uberX,CHF,not a date,,,,,1,60,completed,5,qux
+Lausanne, green ,CHF,2024-02-03 18:00:00,2024-02-03 18:02:00,2024-02-03 18:12:00,,,abc,NaN,completed,oops,

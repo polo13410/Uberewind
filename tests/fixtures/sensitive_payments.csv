@@ -1,0 +1,4 @@
+payment_added,profile_type,card_type,card_bin,card_number,bank_name
+2020-01-01,BANK_CARD,VISA,411111,4111111111111111,SECRET_BANK
+2020-02-01,PAYPAL,,,,
+2021-02-01,bank_card,MASTERCARD,555555,5555555555554444,SECRET_BANK

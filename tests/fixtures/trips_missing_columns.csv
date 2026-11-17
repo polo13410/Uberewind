@@ -1,0 +1,3 @@
+city_name,request_timestamp_local,status
+Lyon,2022-12-24 20:00:00,completed
+Lyon,2022-12-25 01:00:00,unfulfilled

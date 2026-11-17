@@ -1,0 +1,44 @@
+# Dependencies & build output
+node_modules/
+dist/
+*.tsbuildinfo
+*.log
+
+# Test artifacts (may contain screenshots / traces of real data)
+test-results/
+playwright-report/
+blob-report/
+playwright/.cache/
+
+# Editor / OS
+.DS_Store
+Thumbs.db
+.idea/
+*.swp
+
+# Local env
+.env
+.env.*
+
+# ---------------------------------------------------------------------------
+# PERSONAL DATA — never commit a real Uber export.
+# ---------------------------------------------------------------------------
+# Local copy of a real export used by tests/core/sample.test.ts and e2e.
+sample-data/
+# Any Uber export archive or extracted folder, wherever it is dropped.
+*.zip
+Uber Data/
+Uber Data Request*/
+# Uber export CSV / HTML files outside the synthetic test fixtures.
+*rider_lifetime_*.csv
+*eats_order_details*.csv
+*eats_app_analytics*.csv
+*rider_account_profile_information*.csv
+*payment_methods*.csv
+*rider_eater_saved_locations*.csv
+*customer_support_tickets*.csv
+*communications_*.csv
+*driver_*.csv
+dashboard.html
+# Synthetic fixtures (fake data) are allowed.
+!tests/fixtures/*.csv

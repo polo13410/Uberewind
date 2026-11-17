@@ -1,0 +1,7 @@
+City_Name,Restaurant_Name,Request_Time_Local,Final_Delivery_Time_Local,Order_Status,Item_Name,Item_quantity,Item_Price,Order_Price,Currency,Order_UUID,Fulfillment_Type,Special_Instructions
+Lausanne,Pizza Roma,2024-03-01 19:00:00,2024-03-01 19:40:00,completed,Margherita,2,15,42.90,CHF,uuid-1,DELIVERY,ring twice please
+Lausanne,Pizza Roma,2024-03-01 19:00:00,2024-03-01 19:40:00,completed,Tiramisu,1,7,42.90,CHF,uuid-1,DELIVERY,ring twice please
+Lausanne,Pizza Roma,2024-03-01 19:00:00,2024-03-01 19:40:00,completed,Coca,1,4,42.90,CHF,uuid-1,DELIVERY,ring twice please
+Paris,Sushi Go,2024-04-10 12:30:00,,canceled,Maki,1,8,,EUR,uuid-2,DELIVERY_THIRD_PARTY,
+Paris,Sushi Go,2024-05-11 13:00:00,2024-05-11 13:25:00,completed,Maki,3,8,24.00,EUR,uuid-3,PICKUP,
+Paris,Sushi Go,,2024-05-12 13:25:00,completed,Maki,3,8,24.00,EUR,uuid-4,PICKUP,
