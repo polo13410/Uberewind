@@ -54,7 +54,10 @@ function extent(points: Array<[number, number]>, minSpan: number): Feature<Multi
   };
 }
 
-export function GeoMap({ cities, segments = [], focus, onSelectCity, describe, colorIndex = 0, ariaLabel }: GeoMapProps) {
+/** Stable default: a fresh `[]` on every render would re-fit the projection and reset the zoom. */
+const NO_SEGMENTS: Segment[] = [];
+
+export function GeoMap({ cities, segments = NO_SEGMENTS, focus, onSelectCity, describe, colorIndex = 0, ariaLabel }: GeoMapProps) {
   const th = useChartTheme();
   const wrapRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
@@ -120,11 +123,13 @@ export function GeoMap({ cities, segments = [], focus, onSelectCity, describe, c
     };
   }, []);
 
-  // New framing → reset zoom.
+  // Reset the zoom only when the framing really changes (focused city, data, size),
+  // never because of a mere re-render — zoom/pan events re-render on every frame.
+  const framingKey = `${focus?.name ?? ''}|${cities.length}|${focusSegments.length}|${width}x${height}`;
   useEffect(() => {
     if (svgRef.current && zoomRef.current) select(svgRef.current).call(zoomRef.current.transform, zoomIdentity);
     setHover(null);
-  }, [projection]);
+  }, [framingKey]);
 
   const zoomBy = (k: number) => svgRef.current && zoomRef.current && select(svgRef.current).call(zoomRef.current.scaleBy, k);
   const reset = () => {

@@ -175,6 +175,34 @@ test('offline maps: rides and Eats, city focus, no network', async ({ page, base
   expect(await w.cspViolations()).toEqual([]);
 });
 
+test('map zoom and pan stick (no snap back) on both maps', async ({ page }) => {
+  await page.goto('/');
+  await upload(page, 'demo.zip', Buffer.from(makeDemoExport()));
+  for (const tab of ['Uber Eats', 'Courses']) {
+    await page.getByRole('tab', { name: tab }).click();
+    const map = page.locator('.map').first();
+    const layer = map.locator('svg.map-svg > g');
+    await expect(layer).toHaveAttribute('transform', 'translate(0,0) scale(1)');
+
+    await map.getByRole('button', { name: 'Zoomer', exact: true }).click();
+    await map.getByRole('button', { name: 'Zoomer', exact: true }).click();
+    const box = (await map.locator('svg.map-svg').boundingBox())!;
+    await page.mouse.move(box.x + box.width / 3, box.y + box.height / 2);
+    await page.mouse.down();
+    await page.mouse.move(box.x + box.width / 3 + 80, box.y + box.height / 2 + 30, { steps: 8 });
+    await page.mouse.up();
+
+    await page.waitForTimeout(500);
+    const t = await layer.getAttribute('transform');
+    expect(t, `${tab}: zoom kept`).toMatch(/scale\(2\.5/);
+    expect(t, `${tab}: pan kept`).not.toContain('translate(0,0)');
+    // Still the same a bit later, after the pointer moves around the map.
+    await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 5 });
+    await page.waitForTimeout(400);
+    expect(await layer.getAttribute('transform'), `${tab}: stable`).toBe(t);
+  }
+});
+
 test.describe(() => {
   test.skip(!existsSync(samplePath), 'sample-data absent');
   test('real export matches the reference dashboard', async ({ page, baseURL }) => {
