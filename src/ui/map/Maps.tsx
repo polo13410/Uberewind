@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import type { EatsOrder, Trip } from '../../core/types';
 import rows from '../../geo/cities.json';
 import { buildGazetteer, type GazetteerRow } from '../../geo/gazetteer';
@@ -18,18 +18,66 @@ interface MapCardProps {
   describe: (n: number) => string;
   colorIndex?: number;
   unit: string;
+  /** Offer the opt-in street tiles. */
+  allowStreets?: boolean;
 }
 
-function MapCard({ title, sub, layer, segments, describe, colorIndex, unit }: MapCardProps) {
+/**
+ * Explicit, per-visit consent before any street tile is requested. Nothing is
+ * remembered: the next visit starts again with streets off.
+ */
+function StreetsConsent({ onAccept, onCancel }: { onAccept: () => void; onCancel: () => void }) {
+  const id = useId();
+  return (
+    <div className="consent" role="dialog" aria-modal="false" aria-labelledby={`${id}-t`} aria-describedby={`${id}-d`}>
+      <p id={`${id}-t`} className="consent-title">
+        Afficher les rues ?
+      </p>
+      <p id={`${id}-d`}>
+        Les rues viennent des serveurs d’<b>OpenStreetMap</b>. Pour les afficher, votre navigateur télécharge des
+        images de la <b>zone affichée</b> : OpenStreetMap reçoit donc la zone regardée, votre adresse IP et le nom de ce
+        site,{' '}
+        <b>mais aucune de vos données Uber</b> (ni trajets, ni dates, ni montants). Rien n’est mémorisé : l’option est
+        désactivée à chaque nouvelle visite.
+      </p>
+      <div className="consent-actions">
+        <button type="button" className="btn btn-primary" onClick={onAccept} autoFocus>
+          Afficher les rues
+        </button>
+        <button type="button" className="btn" onClick={onCancel}>
+          Annuler
+        </button>
+      </div>
+    </div>
+  );
+}
+
+function MapCard({ title, sub, layer, segments, describe, colorIndex, unit, allowStreets }: MapCardProps) {
   const [focusName, setFocusName] = useState<string | null>(null);
+  const [consented, setConsented] = useState(false);
+  const [asking, setAsking] = useState(false);
+  const [streets, setStreets] = useState(false);
   const focus = layer.cities.find((c) => c.name === focusName) ?? null;
+
+  const toggleStreets = () => {
+    if (streets) setStreets(false);
+    else if (consented) setStreets(true);
+    else setAsking(true);
+  };
+
   return (
     <ChartCard
       wide
       title={title}
       sub={sub}
       actions={
-        layer.cities.length > 1 && (
+        <div className="map-actions">
+          {allowStreets && layer.cities.length > 0 && (
+            <button type="button" className={`btn btn-toggle${streets ? ' is-on' : ''}`} aria-pressed={streets} onClick={toggleStreets}>
+              <span aria-hidden="true">🗺️</span> Afficher les rues
+            </button>
+          )}
+          {layer.cities.length > 1 && (
           <label className="field">
             Centrer sur
             <select value={focus?.name ?? ''} onChange={(e) => setFocusName(e.target.value || null)}>
@@ -41,12 +89,24 @@ function MapCard({ title, sub, layer, segments, describe, colorIndex, unit }: Ma
               ))}
             </select>
           </label>
-        )
+          )}
+        </div>
       }
       data={{ headers: ['Ville', unit], rows: layer.cities.map((c) => [c.name, c.count]) }}
     >
+      {asking && (
+        <StreetsConsent
+          onAccept={() => {
+            setConsented(true);
+            setStreets(true);
+            setAsking(false);
+          }}
+          onCancel={() => setAsking(false)}
+        />
+      )}
       {layer.cities.length ? (
         <GeoMap
+          streets={streets}
           cities={layer.cities}
           segments={segments}
           focus={focus}
@@ -63,8 +123,10 @@ function MapCard({ title, sub, layer, segments, describe, colorIndex, unit }: Ma
       )}
       <p className="map-foot">
         {layer.unresolved.length > 0 && <>Non localisées : {layer.unresolved.join(', ')}. </>}
-        Ctrl + molette ou pincement pour zoomer, glisser pour déplacer. Fond de carte Natural Earth, intégré au site : aucune
-        requête réseau.
+        Ctrl + molette ou pincement pour zoomer, glisser pour déplacer.{' '}
+        {streets
+          ? 'Rues : © les contributeurs OpenStreetMap (chargées à votre demande).'
+          : 'Fond de carte Natural Earth intégré au site (lacs, fleuves, villes et grands axes au zoom) : aucune requête réseau.'}
       </p>
     </ChartCard>
   );
@@ -83,6 +145,7 @@ export function RidesMap({ trips }: { trips: readonly Trip[] }) {
       }
       layer={layer}
       segments={segments}
+      allowStreets
       describe={(n) => plural(n, 'course', 'courses')}
       unit="Courses"
     />

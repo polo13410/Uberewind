@@ -72,7 +72,8 @@ C'est la contrainte de conception numéro un.
 
 - **Aucun backend, aucune base de données, aucun analytics, aucun CDN.** Le site est 100 % statique et toutes les dépendances, polices comprises, sont embarquées.
 - **CSP stricte** : `default-src 'self'; connect-src 'none'; …` (voir [`csp.ts`](csp.ts)). Même un bug ne pourrait pas envoyer de données. Elle est appliquée à deux endroits : en en-tête HTTP via [`netlify.toml`](netlify.toml), et dans une balise `<meta>` injectée au build.
-- **Les cartes sont hors ligne.** Le fond de carte (formes des pays Natural Earth) et l'index des villes sont intégrés au site. Il n'y a **pas de tuiles** ni de géocodage en ligne.
+- **Les cartes sont hors ligne par défaut.** Le fond de carte (pays, et au zoom lacs, fleuves, zones urbaines et grands axes, d'après Natural Earth) et l'index des villes sont intégrés au site, dans un seul fichier identique pour tout le monde : même la région regardée n'est révélée à personne. Il n'y a pas de géocodage en ligne.
+- **Option « Afficher les rues »** (carte des courses) : elle est **désactivée par défaut**, ne s'active qu'après un écran de consentement, et n'est pas mémorisée d'une visite à l'autre. Les tuiles viennent d'[OpenStreetMap](https://www.openstreetmap.org/copyright), qui reçoit alors la zone affichée, l'adresse IP et le nom du site (`referrerpolicy="origin"`), **jamais les données Uber**. La CSP n'autorise ce domaine que pour des **images** (`img-src`), et `connect-src` reste `'none'`.
 - **Les colonnes sensibles sont ignorées dès le parsing.** Chaque parseur a une **liste blanche** de colonnes, doublée d'une **liste noire** de garde-fou. Ne sont jamais lus : e-mail, téléphone, IP, IMEI, identifiants d'appareil, numéros de carte/BIN, contenu des messages et tickets. `eats_app_analytics` et `communications_*` ne sont même pas décompressés.
 - **Rien n'est persisté** : ni `localStorage`, ni IndexedDB. « Charger un autre export » ou fermer l'onglet efface tout.
 - **Vérifié automatiquement** : les tests e2e échouent si une seule requête quitte l'origine, si une violation CSP survient, ou si une valeur sensible des fixtures apparaît dans la page.
@@ -105,6 +106,7 @@ Pour obtenir votre vrai export : [page « Télécharger vos données » d'Uber](
 | `npm run test:e2e` | Build + tests navigateur (Playwright) |
 | `npm run demo` | Génère un export Uber fictif |
 | `npm run gazetteer` | Régénère l'index hors ligne des villes (Natural Earth) |
+| `npm run basemap` | Régénère le fond hors ligne (lacs, fleuves, zones urbaines, grands axes) |
 
 ## 🧱 Stack technique
 
@@ -113,7 +115,7 @@ Pour obtenir votre vrai export : [page « Télécharger vos données » d'Uber](
 | UI | **React 19** + **TypeScript 7** | Composants typés, `lazy()` pour charger graphiques et cartes à la demande |
 | Build | **Vite 8** | Build rapide ; worker ES natif ; aucun script inline (compatible CSP) |
 | Graphiques | **Recharts 3** | Composants React SVG, aucun style injecté par attribut (`style-src 'self'` strict) |
-| Cartes | **d3-geo** + **d3-zoom** + **topojson-client** + **world-atlas** (Natural Earth 1:50m) | Projection Mercator en SVG, zoom et déplacement, 100 % hors ligne |
+| Cartes | **d3-geo** + **d3-zoom** + **topojson-client** + **world-atlas** (Natural Earth 1:50m, couches 1:10m simplifiées) | Projection Mercator en SVG, zoom et déplacement, hors ligne ; tuiles OSM en option, alignées sur la projection d3 |
 | Parsing CSV | **PapaParse** | Lecture ligne par ligne, guillemets multilignes, séparateur détecté |
 | Zip | **fflate** | Très léger, permet de **filtrer avant décompression** |
 | Concurrence | **Web Worker** | Le thread UI ne se fige pas (≈ 50 Mo de CSV en ≈ 3 s) |
@@ -136,12 +138,14 @@ src/
 ├── geo/                     Cartographie pure, testée
 │   ├── cities.json          index hors ligne des villes (Natural Earth, domaine public)
 │   ├── gazetteer.ts         nom de ville → coordonnées (accents, homonymes)
+│   ├── basemap.json/.ts     fond hors ligne (Natural Earth 1:10m simplifié, encodé en deltas)
+│   ├── tiles.ts             calcul des tuiles OSM optionnelles pour une projection d3
 │   └── mapData.ts           bulles par ville, trajets départ → arrivée
 ├── worker/parser.worker.ts  exécute loadExport hors du thread UI
 ├── state/useExportLoader.ts cycle de vie du worker ; état en mémoire seulement
 └── ui/                      React : accueil, dashboard (4 onglets), graphiques, cartes, tableaux
 csp.ts                       source unique de la CSP (meta, preview, vérifiée contre netlify.toml)
-scripts/                     make-demo-export.mjs, build-gazetteer.mjs (outils de développement)
+scripts/                     make-demo-export.mjs, build-gazetteer.mjs, build-basemap.mjs (outils de développement)
 ```
 
 ```mermaid
@@ -202,19 +206,21 @@ Exemple : `driver_lifetime_trips-*.csv`.
 ## ⚠️ Limites connues
 
 - Les formats ont été validés sur un seul export réel (rider et eater, 2026, en anglais). L'ancien format `trips_data.csv` est lu au mieux, et les exports chauffeur ne sont pas gérés.
-- **Cartes sans fond de rue** : le choix « zéro requête réseau » exclut les tuiles. Les trajets d'une ville sont tracés sur fond neutre, avec une échelle kilométrique.
+- **Rues** : hors ligne, le fond ne montre que les grands axes, lacs, fleuves et zones urbaines. Les rues détaillées demandent l'option OpenStreetMap (en ligne, avec consentement). Les trajets sont des segments droits départ → arrivée : l'export ne contient pas l'itinéraire suivi.
 - Il n'y a pas de conversion de devises. Le graphique mensuel empile les devises, et un sélecteur permet d'en isoler une.
 - Les heures sont affichées telles qu'Uber les fournit (`*_local`), sans conversion de fuseau.
 - Poids (gzip) :
   - accueil ≈ 75 Ko ;
   - tableau de bord ≈ 130 Ko, chargé après le dépôt ;
-  - cartes ≈ 400 Ko, chargées à l'ouverture d'un onglet avec carte.
+  - cartes ≈ 400 Ko, chargées à l'ouverture d'un onglet avec carte ;
+  - fond hors ligne détaillé ≈ 1,7 Mo, chargé seulement au zoom sur une ville.
 - `npm audit` signale une ReDoS dans `picomatch` (dépendance de **build** de Vite et Vitest, non embarquée dans le site). Aucun correctif amont n'existe à ce jour.
 
 ## 🙏 Crédits & licence
 
 - Code sous licence [MIT](LICENSE).
-- Fond de carte et index des villes : [Natural Earth](https://www.naturalearthdata.com/) (domaine public), via [world-atlas](https://github.com/topojson/world-atlas) (ISC).
+- Fond de carte, couches d'orientation et index des villes : [Natural Earth](https://www.naturalearthdata.com/) (domaine public), via [world-atlas](https://github.com/topojson/world-atlas) (ISC) ; régénérables avec `npm run gazetteer` et `npm run basemap`.
+- Fond de rues optionnel : © les contributeurs [OpenStreetMap](https://www.openstreetmap.org/copyright), selon la [politique d'usage des tuiles](https://operations.osmfoundation.org/policies/tiles/).
 - Polices : [DM Sans](https://fonts.google.com/specimen/DM+Sans) et [Instrument Serif](https://fonts.google.com/specimen/Instrument+Serif) (SIL Open Font License), via [Fontsource](https://fontsource.org).
 
 > **Uberewind n'est pas affilié à Uber Technologies Inc.** « Uber » et « Uber Eats » sont des marques de leurs propriétaires respectifs. Ce projet lit uniquement l'export que chaque utilisateur obtient légalement de ses propres données.

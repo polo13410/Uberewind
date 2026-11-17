@@ -7,6 +7,7 @@ import { useSyncExternalStore } from 'react';
  * dark): never cycle it, fold extra series into "Autres".
  */
 const LIGHT = {
+  dark: false,
   series: ['#2a78d6', '#eb6834', '#1baf7a', '#eda100', '#e87ba4', '#008300', '#6250d6', '#e34948'],
   surface: '#ffffff',
   grid: '#e1e0d9',
@@ -17,6 +18,7 @@ const LIGHT = {
 };
 
 const DARK: typeof LIGHT = {
+  dark: true,
   series: ['#3987e5', '#d95926', '#199e70', '#c98500', '#d55181', '#0ca30c', '#9085e9', '#e66767'],
   surface: '#1c1c1c',
   grid: '#2c2c2a',

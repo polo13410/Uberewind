@@ -175,6 +175,70 @@ test('offline maps: rides and Eats, city focus, no network', async ({ page, base
   expect(await w.cspViolations()).toEqual([]);
 });
 
+test('city focus draws the offline orientation layer, still without any request', async ({ page, baseURL }) => {
+  const w = await watch(page);
+  await page.goto('/');
+  await upload(page, 'demo.zip', Buffer.from(makeDemoExport()));
+  await page.getByRole('tab', { name: 'Courses' }).click();
+  await page.getByRole('combobox', { name: 'Centrer sur' }).selectOption('Paris');
+  const roads = page.locator('.map-basemap .bm-road');
+  await expect(roads).toHaveAttribute('d', /^M/);
+  await expect(page.locator('.map-basemap .bm-urban')).toHaveAttribute('d', /^M/);
+  expect(w.requests.filter((u) => !u.startsWith(baseURL!))).toEqual([]);
+  expect(await w.cspViolations()).toEqual([]);
+});
+
+test('street tiles: opt-in with consent, OpenStreetMap images only, nothing else', async ({ page, baseURL }) => {
+  // Serve tiles locally so the test never depends on (or calls) the real provider.
+  const png = Buffer.from(
+    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=',
+    'base64',
+  );
+  const tileHits: string[] = [];
+  const referers: string[] = [];
+  await page.route(/tile\.openstreetmap\.org/, (route) => {
+    tileHits.push(route.request().url());
+    referers.push(route.request().headers()['referer'] ?? '');
+    return route.fulfill({ status: 200, contentType: 'image/png', body: png });
+  });
+  const w = await watch(page);
+  await page.goto('/');
+  await upload(page, 'demo.zip', Buffer.from(makeDemoExport()));
+  await page.getByRole('tab', { name: 'Courses' }).click();
+  await page.getByRole('combobox', { name: 'Centrer sur' }).selectOption('Paris');
+
+  const toggle = page.getByRole('button', { name: /Afficher les rues/ }).first();
+  await expect(toggle).toHaveAttribute('aria-pressed', 'false');
+  await toggle.click();
+  const dialog = page.getByRole('dialog', { name: 'Afficher les rues ?' });
+  await expect(dialog).toContainText('aucune de vos données Uber');
+  // Cancel → still nothing requested.
+  await dialog.getByRole('button', { name: 'Annuler' }).click();
+  await page.waitForTimeout(300);
+  expect(tileHits).toEqual([]);
+
+  // Accept → tiles requested, from OpenStreetMap only, as images.
+  await toggle.click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Afficher les rues' }).click();
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  await expect(page.locator('.map-tiles img').first()).toBeAttached();
+  await expect(page.locator('.map-attrib')).toContainText('OpenStreetMap');
+  await expect.poll(() => tileHits.length).toBeGreaterThan(0);
+  for (const u of tileHits) expect(u).toMatch(/^https:\/\/tile\.openstreetmap\.org\/\d+\/\d+\/\d+\.png$/);
+  // OSM's policy wants a Referer: only the site origin is sent, never a path.
+  for (const r of referers) expect(r).toBe(`${baseURL}/`);
+  const others = w.requests.filter((u) => !u.startsWith(baseURL!) && !/tile\.openstreetmap\.org/.test(u));
+  expect(others).toEqual([]);
+  expect(await w.cspViolations()).toEqual([]);
+
+  // Off again → tiles removed; no new consent needed this visit.
+  await toggle.click();
+  await expect(page.locator('.map-tiles')).toHaveCount(0);
+  await toggle.click();
+  await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+});
+
 test('map zoom and pan stick (no snap back) on both maps', async ({ page }) => {
   await page.goto('/');
   await upload(page, 'demo.zip', Buffer.from(makeDemoExport()));

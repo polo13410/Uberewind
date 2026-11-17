@@ -15,7 +15,8 @@
     "test:watch": "vitest",
     "test:e2e": "vite build && playwright test",
     "demo": "node scripts/make-demo-export.mjs",
-    "gazetteer": "node scripts/build-gazetteer.mjs"
+    "gazetteer": "node scripts/build-gazetteer.mjs",
+    "basemap": "node scripts/build-basemap.mjs"
   },
   "dependencies": {
     "@fontsource/dm-sans": "^5.3.0",

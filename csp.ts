@@ -7,7 +7,9 @@ export const CSP_DIRECTIVES: Record<string, string> = {
   'default-src': "'self'",
   'script-src': "'self'",
   'style-src': "'self'",
-  'img-src': "'self'",
+  // Street tiles are opt-in (explicit consent in the UI) and image-only:
+  // connect-src stays 'none', so no script can send data anywhere.
+  'img-src': "'self' https://tile.openstreetmap.org",
   'font-src': "'self'",
   'connect-src': "'none'",
   'worker-src': "'self'",

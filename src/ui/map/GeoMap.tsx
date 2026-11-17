@@ -6,13 +6,20 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { feature, mesh } from 'topojson-client';
 import type { GeometryCollection, Topology } from 'topojson-specification';
 import world from 'world-atlas/countries-50m.json';
+import { inBox, loadBasemap, toPath, type Basemap, type Box } from '../../geo/basemap';
 import type { CityPoint, Segment } from '../../geo/mapData';
+import { MERCATOR_MAX_LAT, TILE_ATTRIBUTION, visibleTiles } from '../../geo/tiles';
 import { useChartTheme } from '../useChartTheme';
 
 /*
- * Offline vector map: Natural Earth country shapes bundled with the app,
- * rendered as SVG with d3-geo. No tiles, no network request.
+ * Vector map: Natural Earth shapes bundled with the app, rendered as SVG with
+ * d3-geo. By default no tiles and no network request at all. When zoomed on a
+ * city, an offline orientation layer (lakes, rivers, urban areas, major roads)
+ * is drawn. Street tiles are an explicit opt-in (`streets`).
  */
+
+/** Zoom level (d3-zoom k) from which the offline orientation layer appears outside city view. */
+const BASEMAP_MIN_K = 3;
 
 const topo = world as unknown as Topology<{ countries: GeometryCollection; land: GeometryCollection }>;
 const LAND = feature(topo, topo.objects.land) as FeatureCollection;
@@ -28,6 +35,8 @@ interface GeoMapProps {
   describe: (count: number) => string;
   colorIndex?: number;
   ariaLabel: string;
+  /** Opt-in street tiles (the user has consented). */
+  streets?: boolean;
 }
 
 /** Bounding "MultiPoint" with a minimum span (degrees) so a single city is not zoomed to the street. */
@@ -57,13 +66,25 @@ function extent(points: Array<[number, number]>, minSpan: number): Feature<Multi
 /** Stable default: a fresh `[]` on every render would re-fit the projection and reset the zoom. */
 const NO_SEGMENTS: Segment[] = [];
 
-export function GeoMap({ cities, segments = NO_SEGMENTS, focus, onSelectCity, describe, colorIndex = 0, ariaLabel }: GeoMapProps) {
+export function GeoMap({
+  cities,
+  segments = NO_SEGMENTS,
+  focus,
+  onSelectCity,
+  describe,
+  colorIndex = 0,
+  ariaLabel,
+  streets = false,
+}: GeoMapProps) {
   const th = useChartTheme();
   const wrapRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const zoomRef = useRef<ZoomBehavior<SVGSVGElement, unknown> | null>(null);
   const [width, setWidth] = useState(640);
   const [transform, setTransform] = useState<ZoomTransform>(zoomIdentity);
+  /** Transform at the end of the last gesture: the offline layer is culled with it (not on every frame). */
+  const [settled, setSettled] = useState<ZoomTransform>(zoomIdentity);
+  const [basemap, setBasemap] = useState<Basemap | null>(null);
   const [hover, setHover] = useState<{ city: CityPoint; x: number; y: number } | null>(null);
   const height = Math.round(Math.max(260, Math.min(440, width * 0.58)));
 
@@ -115,7 +136,8 @@ export function GeoMap({ cities, segments = NO_SEGMENTS, focus, onSelectCity, de
         if (ev.type.startsWith('touch')) return (ev as TouchEvent).touches.length > 1;
         return !(ev as MouseEvent).button;
       })
-      .on('zoom', (ev: D3ZoomEvent<SVGSVGElement, unknown>) => setTransform(ev.transform));
+      .on('zoom', (ev: D3ZoomEvent<SVGSVGElement, unknown>) => setTransform(ev.transform))
+      .on('end', (ev: D3ZoomEvent<SVGSVGElement, unknown>) => setSettled(ev.transform));
     zoomRef.current = z;
     select(svg).call(z);
     return () => {
@@ -128,6 +150,7 @@ export function GeoMap({ cities, segments = NO_SEGMENTS, focus, onSelectCity, de
   const framingKey = `${focus?.name ?? ''}|${cities.length}|${focusSegments.length}|${width}x${height}`;
   useEffect(() => {
     if (svgRef.current && zoomRef.current) select(svgRef.current).call(zoomRef.current.transform, zoomIdentity);
+    setSettled(zoomIdentity);
     setHover(null);
   }, [framingKey]);
 
@@ -138,6 +161,54 @@ export function GeoMap({ cities, segments = NO_SEGMENTS, focus, onSelectCity, de
   };
 
   const k = transform.k;
+
+  // ---- Offline orientation layer (city view or zoomed in), culled to the settled viewport.
+  const wantBasemap = !streets && (focus != null || settled.k >= BASEMAP_MIN_K);
+  useEffect(() => {
+    if (!wantBasemap || basemap) return;
+    let alive = true;
+    loadBasemap()
+      .then((b) => alive && setBasemap(b))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [wantBasemap, basemap]);
+
+  const basemapPaths = useMemo(() => {
+    if (!wantBasemap || !basemap) return null;
+    // Visible area (in degrees) at the settled zoom, with a 50 % margin for panning.
+    const [x0, y0] = settled.invert([-width * 0.5, -height * 0.5]);
+    const [x1, y1] = settled.invert([width * 1.5, height * 1.5]);
+    const nw = projection.invert?.([x0, y0]);
+    const se = projection.invert?.([x1, y1]);
+    if (!nw || !se) return null;
+    const box: Box = [nw[0], se[1], se[0], nw[1]];
+    const proj = (p: [number, number]) => projection(p) as [number, number] | null;
+    const q = basemap.q;
+    return {
+      urban: toPath(inBox(basemap.urban, box, q), q, proj, true),
+      lakes: toPath(inBox(basemap.lakes, box, q), q, proj, true),
+      rivers: toPath(inBox(basemap.rivers, box, q), q, proj, false),
+      roads: toPath(inBox(basemap.roads, box, q), q, proj, false),
+    };
+  }, [wantBasemap, basemap, settled, projection, width, height]);
+
+  // ---- Opt-in street tiles, positioned in screen space for the live transform.
+  const tiles = streets
+    ? visibleTiles(
+        {
+          scale: projection.scale(),
+          origin: [projection([-180, 0])?.[0] ?? 0, projection([0, MERCATOR_MAX_LAT])?.[1] ?? 0],
+          k: transform.k,
+          tx: transform.x,
+          ty: transform.y,
+          width,
+          height,
+        },
+      )
+    : [];
+
   const max = Math.max(1, ...cities.map((c) => c.count));
   const radius = (c: CityPoint) => 4 + 20 * Math.sqrt(c.count / max);
   const color = th.series[colorIndex % th.series.length];
@@ -174,7 +245,24 @@ export function GeoMap({ cities, segments = NO_SEGMENTS, focus, onSelectCity, de
   })();
 
   return (
-    <div className="map" ref={wrapRef}>
+    <div className={`map${streets ? ' has-streets' : ''}${th.dark ? ' is-dark' : ''}`} ref={wrapRef}>
+      {streets && (
+        // HTML <img> (not SVG <image>) so each tile can send the site origin as Referer,
+        // which OSM's tile policy requires, while the page itself stays `no-referrer`.
+        <div className="map-tiles" aria-hidden="true">
+          {tiles.map((t) => (
+            <img
+              key={t.key}
+              src={t.url}
+              alt=""
+              referrerPolicy="origin"
+              decoding="async"
+              draggable={false}
+              style={{ left: t.x, top: t.y, width: t.size + 0.5, height: t.size + 0.5 }}
+            />
+          ))}
+        </div>
+      )}
       <svg
         ref={svgRef}
         className="map-svg"
@@ -185,10 +273,18 @@ export function GeoMap({ cities, segments = NO_SEGMENTS, focus, onSelectCity, de
         aria-label={ariaLabel}
         onMouseLeave={() => setHover(null)}
       >
-        <rect className="map-water" width={width} height={height} />
+        {!streets && <rect className="map-water" width={width} height={height} />}
         <g transform={transform.toString()}>
-          <path className="map-land" d={paths.land} />
-          <path className="map-border" d={paths.borders} />
+          {!streets && <path className="map-land" d={paths.land} />}
+          {basemapPaths && (
+            <g className="map-basemap">
+              <path className="bm-urban" d={basemapPaths.urban} />
+              <path className="bm-lake" d={basemapPaths.lakes} />
+              <path className="bm-river" d={basemapPaths.rivers} />
+              <path className="bm-road" d={basemapPaths.roads} />
+            </g>
+          )}
+          {!streets && <path className="map-border" d={paths.borders} />}
           {lines.length > 0 && (
             <g className="map-trips" stroke={color}>
               {lines}
@@ -260,6 +356,15 @@ export function GeoMap({ cities, segments = NO_SEGMENTS, focus, onSelectCity, de
           </span>
         )}
       </div>
+      {streets && (
+        <div className="map-attrib">
+          {TILE_ATTRIBUTION.map((a) => (
+            <a key={a.href} href={a.href} target="_blank" rel="noopener noreferrer">
+              {a.label}
+            </a>
+          ))}
+        </div>
+      )}
       <div className="map-controls">
         <button type="button" className="map-btn" onClick={() => zoomBy(1.6)} aria-label="Zoomer">
           +

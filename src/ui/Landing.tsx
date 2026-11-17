@@ -86,6 +86,10 @@ export function Landing({ onFiles, loading }: { onFiles: (f: File[]) => void; lo
               dès la lecture et ne sont jamais affichés.
             </li>
             <li>Rien n’est conservé : fermer l’onglet ou charger un autre export efface tout de la mémoire.</li>
+            <li>
+              Les cartes fonctionnent hors ligne. Seule exception, sur demande explicite : le fond de rues OpenStreetMap,
+              désactivé par défaut. Il ne demande que des images de la zone affichée, jamais vos données.
+            </li>
           </ul>
         </details>
       </main>
