@@ -2,10 +2,12 @@ import type { LocalTime } from './types';
 
 /**
  * Column names that must never be read, whatever the alias tables say.
- * Second line of defence behind the per-file whitelists.
+ * Second line of defence behind the per-file whitelists. (Trip pick-up /
+ * drop-off coordinates are whitelisted for the on-device map; saved-location
+ * coordinates are simply never listed.)
  */
 export const SENSITIVE_HEADER_RE =
-  /(e_?mail|phone|mobile|ip_?address|(^|_)ip($|_)|imei|device|advertis|idfa|card_?number|card_?bin|(^|_)bin($|_)|message|content|lastname|last_name|password|token|instruction|session|picture|(^|_)lat($|_)|(^|_)lng($|_)|latitude|longitude)/i;
+  /(e_?mail|phone|mobile|ip_?address|(^|_)ip($|_)|imei|device|advertis|idfa|card_?number|card_?bin|(^|_)bin($|_)|message|content|lastname|last_name|password|token|instruction|session|picture|signup_lat|signup_lng)/i;
 
 export function isSensitiveHeader(normalizedHeader: string): boolean {
   return SENSITIVE_HEADER_RE.test(normalizedHeader);

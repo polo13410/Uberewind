@@ -10,6 +10,7 @@ import { expect, test, type Page } from '@playwright/test';
 import { strToU8, zipSync } from 'fflate';
 import { existsSync, readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
+import { makeDemoExport } from '../../scripts/make-demo-export.mjs';
 
 const fx = (name: string) => readFileSync(fileURLToPath(new URL(`../fixtures/${name}`, import.meta.url)));
 
@@ -51,7 +52,7 @@ async function watch(page: Page): Promise<Watch> {
 
 async function upload(page: Page, name: string, buffer: Buffer) {
   await page.locator('input[type=file]').setInputFiles({ name, mimeType: 'application/zip', buffer });
-  await expect(page.getByRole('heading', { name: 'Mes données Uber' })).toBeVisible({ timeout: 30_000 });
+  await expect(page.getByRole('heading', { name: 'Votre rétrospective Uber' })).toBeVisible({ timeout: 30_000 });
 }
 
 const TABS = ['Vue d’ensemble', 'Uber Eats', 'Courses', 'Compte'];
@@ -118,7 +119,7 @@ test('warnings panel, keyboard tabs and reset', async ({ page }) => {
   await expect(page.getByText(/^2 \/ 4 lignes$/)).toBeVisible();
 
   await page.getByRole('button', { name: /Charger un autre export/ }).click();
-  await expect(page.getByText('Déposez ici le fichier .zip de votre export Uber')).toBeVisible();
+  await expect(page.getByText('Glissez votre export Uber ici')).toBeVisible();
 });
 
 test('no horizontal scroll at 375 px', async ({ page }) => {
@@ -136,6 +137,42 @@ test('no horizontal scroll at 375 px', async ({ page }) => {
     expect(await overflow(), `overflow on ${name}`).toBeLessThanOrEqual(0);
     expect(await gutter('[role=tabpanel] .kpi, [role=tabpanel] .card'), `gutter on ${name}`).toBeGreaterThanOrEqual(16);
   }
+});
+
+test('landing call to action and outbound links', async ({ page }) => {
+  await page.goto('/');
+  await expect(page.getByRole('heading', { level: 1, name: 'Uberewind' })).toBeVisible();
+  const dz = page.getByRole('button', { name: /Déposer ou choisir le fichier/ });
+  await expect(dz).toBeVisible();
+  // Keyboard opens the file picker.
+  const chooser = page.waitForEvent('filechooser');
+  await dz.focus();
+  await page.keyboard.press('Enter');
+  await chooser;
+  await expect(page.getByRole('link', { name: /vérifiez le code/ })).toHaveAttribute('href', 'https://github.com/polo13410/Uberewind');
+  await expect(page.getByRole('link', { name: /Télécharger vos données/ })).toHaveAttribute('href', /myprivacy\.uber\.com/);
+});
+
+test('offline maps: rides and Eats, city focus, no network', async ({ page, baseURL }) => {
+  const w = await watch(page);
+  await page.goto('/');
+  await upload(page, 'demo.zip', Buffer.from(makeDemoExport()));
+
+  await page.getByRole('tab', { name: 'Courses' }).click();
+  const ridesMap = page.getByRole('img', { name: /^Carte des courses/ });
+  await expect(ridesMap).toBeVisible();
+  await expect(ridesMap.getByRole('button', { name: /^Paris : \d+ courses$/ })).toBeVisible();
+  // Focus a city: its trips are drawn.
+  await page.getByRole('combobox', { name: 'Centrer sur' }).selectOption('Paris');
+  await expect(page.locator('.map-trips line').first()).toBeAttached();
+  await expect(page.locator('.map-key')).toContainText('arrivée');
+
+  await page.getByRole('tab', { name: 'Uber Eats' }).click();
+  const eatsMap = page.getByRole('img', { name: /^Carte des commandes/ });
+  await expect(eatsMap.getByRole('button', { name: /^Lausanne : \d+ commandes$/ })).toBeVisible();
+
+  expect(w.requests.filter((u) => !u.startsWith(baseURL!))).toEqual([]);
+  expect(await w.cspViolations()).toEqual([]);
 });
 
 test.describe(() => {

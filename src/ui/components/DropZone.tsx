@@ -41,7 +41,18 @@ async function filesFromDrop(dt: DataTransfer): Promise<File[]> {
   return [...dt.files];
 }
 
-export function DropZone({ onFiles }: { onFiles: (files: File[]) => void }) {
+const UploadIcon = () => (
+  <svg className="dz-icon" viewBox="0 0 48 48" aria-hidden="true">
+    <rect x="9" y="5" width="30" height="38" rx="5" fill="none" stroke="currentColor" strokeWidth="2.5" />
+    <path d="M24 33V17m0 0-6.5 6.5M24 17l6.5 6.5" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" />
+  </svg>
+);
+
+/**
+ * Main call to action: a large drop target. The whole card is clickable and
+ * keyboard-activable (Entrée / Espace) and opens the file picker.
+ */
+export function DropZone({ onFiles, loading }: { onFiles: (files: File[]) => void; loading?: string }) {
   const input = useRef<HTMLInputElement>(null);
   const [over, setOver] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -56,30 +67,48 @@ export function DropZone({ onFiles }: { onFiles: (files: File[]) => void }) {
     onFiles(ok);
   };
 
-  const onDrop = async (e: DragEvent) => {
-    e.preventDefault();
-    setOver(false);
-    accept(await filesFromDrop(e.dataTransfer));
-  };
+  const open = () => !loading && input.current?.click();
 
   return (
     <div
-      className={`dropzone${over ? ' is-over' : ''}`}
+      className={`dropzone${over ? ' is-over' : ''}${loading ? ' is-loading' : ''}`}
+      role="button"
+      tabIndex={loading ? -1 : 0}
+      aria-label="Déposer ou choisir le fichier .zip de votre export Uber"
+      aria-busy={!!loading}
+      onClick={open}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault();
+          open();
+        }
+      }}
       onDragOver={(e) => {
         e.preventDefault();
         e.dataTransfer.dropEffect = 'copy';
         setOver(true);
       }}
       onDragLeave={() => setOver(false)}
-      onDrop={onDrop}
+      onDrop={async (e: DragEvent) => {
+        e.preventDefault();
+        setOver(false);
+        if (!loading) accept(await filesFromDrop(e.dataTransfer));
+      }}
     >
-      <p className="big">Déposez ici le fichier .zip de votre export Uber</p>
-      <p className="muted">ou plusieurs fichiers .csv, ou le dossier décompressé</p>
-      <p>
-        <button type="button" className="btn btn-primary" onClick={() => input.current?.click()}>
-          Choisir un fichier…
-        </button>
-      </p>
+      {loading ? (
+        <div className="dz-body" role="status" aria-live="polite">
+          <span className="spinner" aria-hidden="true" />
+          <p className="dz-title">Analyse en cours…</p>
+          <p className="dz-sub">{loading}</p>
+        </div>
+      ) : (
+        <div className="dz-body">
+          <UploadIcon />
+          <p className="dz-title">{over ? 'Relâchez pour rembobiner' : 'Glissez votre export Uber ici'}</p>
+          <p className="dz-sub">le fichier .zip tel quel, plusieurs .csv ou le dossier décompressé</p>
+          <span className="dz-cta">Choisir le fichier</span>
+        </div>
+      )}
       <input
         ref={input}
         className="sr-only"
@@ -88,14 +117,15 @@ export function DropZone({ onFiles }: { onFiles: (files: File[]) => void }) {
         multiple
         aria-label="Choisir le fichier .zip ou les fichiers .csv de l’export Uber"
         tabIndex={-1}
+        onClick={(e) => e.stopPropagation()}
         onChange={(e) => {
           accept([...(e.target.files ?? [])]);
           e.target.value = '';
         }}
       />
       {error && (
-        <p role="alert" className="muted">
-          ⚠️ {error}
+        <p role="alert" className="dz-error">
+          {error}
         </p>
       )}
     </div>

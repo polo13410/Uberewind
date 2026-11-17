@@ -1,9 +1,13 @@
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import type { LoadResult, Trip } from '../../core/types';
 import { ChartCard, ColumnChart, Empty, HBarChart, ScatterPlot } from '../components/Charts';
 import { DataTable, type Column, type SelectFilter } from '../components/DataTable';
 import { Kpis, type Kpi } from '../components/Kpis';
 import { fmtDateTime, fmtInt, fmtMoney, fmtNum, moneyList, statusTone, tripStatusLabel, WEEKDAYS, WEEKDAYS_LONG } from '../format';
+
+// The map (country shapes + offline city index, ~1 MB) is only loaded when shown.
+const RidesMap = lazy(() => import('../map/Maps').then((m) => ({ default: m.RidesMap })));
+const mapFallback = <section className="card wide map-loading" aria-busy="true"><p className="empty">Chargement de la carte…</p></section>;
 
 export function Rides({ result }: { result: LoadResult }) {
   const s = result.stats?.rides;
@@ -76,6 +80,9 @@ export function Rides({ result }: { result: LoadResult }) {
       <div className="grid">
         {trips && (
           <>
+            <Suspense fallback={mapFallback}>
+              <RidesMap trips={trips} />
+            </Suspense>
             <ChartCard title="Courses par année" sub="Toutes les demandes" data={{ headers: ['Année', 'Courses'], rows: s.byYear.map((y) => [y.key, y.count]) }}>
               <ColumnChart data={s.byYear.map((y) => ({ key: y.key, n: y.count }))} xKey="key" series={[{ key: 'n', name: 'Courses' }]} />
             </ChartCard>

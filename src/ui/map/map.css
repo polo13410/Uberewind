@@ -1,0 +1,189 @@
+/* Offline vector map (src/ui/map/GeoMap.tsx) */
+:root {
+  --map-water: #eef2f5;
+  --map-land: #ffffff;
+  --map-border: #c9cdd2;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --map-water: #10161c;
+    --map-land: #23272b;
+    --map-border: #3a4046;
+  }
+}
+
+.map {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.map-svg {
+  display: block;
+  width: 100%;
+  height: auto;
+  cursor: grab;
+  /* One finger scrolls the page; pinch zoom goes to the map. */
+  touch-action: pan-x pan-y;
+}
+
+.map-svg:active {
+  cursor: grabbing;
+}
+
+.map-water {
+  fill: var(--map-water);
+}
+
+.map-land {
+  fill: var(--map-land);
+}
+
+.map-border {
+  fill: none;
+  stroke: var(--map-border);
+  stroke-width: 0.8;
+  vector-effect: non-scaling-stroke;
+}
+
+.map-trips line {
+  stroke-width: 1.4;
+  stroke-opacity: 0.45;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+
+.map-ends circle {
+  fill-opacity: 0.85;
+}
+
+.map-city {
+  fill-opacity: 0.78;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+  cursor: pointer;
+  transition: fill-opacity 0.15s;
+}
+
+.map-city:hover,
+.map-city:focus-visible,
+.map-city.is-active {
+  fill-opacity: 1;
+  outline: none;
+  stroke: var(--tx);
+}
+
+.map-city.is-dim {
+  fill-opacity: 0.35;
+}
+
+.map-label {
+  fill: var(--tx);
+  font-weight: 500;
+  paint-order: stroke;
+  stroke: var(--map-land);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+  pointer-events: none;
+}
+
+.map-tooltip {
+  position: absolute;
+  transform: translate(-50%, calc(-100% - 8px));
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 2;
+}
+
+.map-controls {
+  position: absolute;
+  right: 8px;
+  top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.map-btn {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  border: 1px solid var(--bd);
+  background: var(--card);
+  color: var(--tx);
+  cursor: pointer;
+  font-size: 16px;
+  line-height: 1;
+}
+
+.map-btn:hover {
+  border-color: var(--mu);
+}
+
+.map-foot {
+  margin: 8px 0 0;
+  font-size: 12px;
+  color: var(--mu);
+}
+
+.map-loading {
+  min-height: 320px;
+  display: grid;
+  place-items: center;
+}
+
+.map-start {
+  fill: var(--map-land);
+  stroke: currentColor;
+  stroke-width: 1.5;
+  vector-effect: non-scaling-stroke;
+}
+
+.map-ends {
+  color: inherit;
+}
+
+.map-overlay {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  pointer-events: none;
+  font-size: 11px;
+  color: var(--tx);
+}
+
+.map-scale,
+.map-key {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 8px;
+  border-radius: 6px;
+  background: color-mix(in srgb, var(--card) 85%, transparent);
+}
+
+.map-scale i {
+  display: inline-block;
+  height: 6px;
+  border: 1.5px solid var(--tx);
+  border-top: 0;
+}
+
+.map-key i {
+  display: inline-block;
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+}
+
+.map-key .k-start {
+  border: 1.5px solid;
+  background: var(--map-land);
+}

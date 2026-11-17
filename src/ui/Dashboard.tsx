@@ -4,6 +4,7 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { Tabs, type TabDef } from './components/Tabs';
 import { WarningsPanel } from './components/WarningsPanel';
 import { fmtDateLong, fmtInt } from './format';
+import { Logo, Wordmark } from './brand/Logo';
 import { PrivacyBadge } from './PrivacyBadge';
 import { Account } from './tabs/Account';
 import { Eats } from './tabs/Eats';
@@ -33,17 +34,21 @@ export function Dashboard({ result, onReset }: { result: LoadResult; onReset: ()
     .join(' · ');
 
   return (
-    <>
+    <div className="dash">
       <header className="container topbar">
         <div className="topbar-row">
-          <div>
-            <h1>Mes données Uber</h1>
-            {subtitle && <p className="sub">{subtitle}</p>}
+          <div className="brand-row">
+            <Logo size={40} />
+            <div>
+              <Wordmark className="wordmark-sm" />
+              <h1>Votre rétrospective Uber</h1>
+            </div>
           </div>
           <button type="button" className="btn" onClick={onReset}>
             ↺ Charger un autre export
           </button>
         </div>
+        {subtitle && <p className="sub">{subtitle}</p>}
         <p>
           <PrivacyBadge />
         </p>
@@ -82,6 +87,6 @@ export function Dashboard({ result, onReset }: { result: LoadResult; onReset: ()
           </div>
         </main>
       )}
-    </>
+    </div>
   );
 }

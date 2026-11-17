@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import type { EatsOrder, LoadResult } from '../../core/types';
 import { ChartCard, ColumnChart, HBarChart } from '../components/Charts';
 import type { Column, SelectFilter } from '../components/DataTable';
@@ -19,6 +19,10 @@ import {
 } from '../format';
 
 const itemsText = (o: EatsOrder) => o.items.map((i) => `${fmtInt(i.qty)}× ${i.name}`).join(', ');
+
+// The map (country shapes + offline city index, ~1 MB) is only loaded when shown.
+const EatsMap = lazy(() => import('../map/Maps').then((m) => ({ default: m.EatsMap })));
+const mapFallback = <section className="card wide map-loading" aria-busy="true"><p className="empty">Chargement de la carte…</p></section>;
 
 export function Eats({ result }: { result: LoadResult }) {
   const s = result.stats?.eats;
@@ -116,6 +120,9 @@ export function Eats({ result }: { result: LoadResult }) {
             valueFormat={(v, key) => fmtMoney(v, key)}
           />
         </ChartCard>
+        <Suspense fallback={mapFallback}>
+          <EatsMap orders={orders} trips={result.dataset.trips ?? []} />
+        </Suspense>
         <ChartCard title="Restaurants les plus commandés" sub="Nombre de commandes livrées" data={{ headers: ['Restaurant', 'Commandes'], rows: s.topRestaurants.map((r) => [r.key, r.count]) }}>
           <HBarChart items={s.topRestaurants} />
         </ChartCard>

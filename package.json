@@ -1,5 +1,5 @@
 {
-  "name": "uber-data-viewer",
+  "name": "uberewind",
   "private": true,
   "version": "0.1.0",
   "type": "module",
@@ -13,24 +13,44 @@
     "typecheck": "tsc -b",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "vite build && playwright test"
+    "test:e2e": "vite build && playwright test",
+    "demo": "node scripts/make-demo-export.mjs",
+    "gazetteer": "node scripts/build-gazetteer.mjs"
   },
   "dependencies": {
+    "@fontsource/dm-sans": "^5.3.0",
+    "@fontsource/instrument-serif": "^5.3.0",
+    "d3-geo": "^3.1.2",
+    "d3-selection": "^3.0.1",
+    "d3-zoom": "^3.0.1",
     "fflate": "^0.8.3",
     "papaparse": "^5.7.1",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "recharts": "^3.11.0"
+    "recharts": "^3.11.0",
+    "topojson-client": "^3.1.0",
+    "world-atlas": "^2.0.2"
   },
   "devDependencies": {
     "@playwright/test": "^1.65.1",
+    "@types/d3-geo": "^3.1.1",
+    "@types/d3-selection": "^3.0.12",
+    "@types/d3-zoom": "^3.0.9",
+    "@types/geojson": "^7946.0.16",
     "@types/node": "^26.6.6",
     "@types/papaparse": "^5.5.2",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
+    "@types/topojson-client": "^3.1.5",
     "@vitejs/plugin-react": "^6.3.0",
     "typescript": "^7.0.2",
     "vite": "^8.3.8",
     "vitest": "^5.1.0"
+  },
+  "description": "Rembobinez vos données Uber : un tableau de bord 100 % local de votre export Uber (courses, Uber Eats, compte).",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/polo13410/Uberewind.git"
   }
 }

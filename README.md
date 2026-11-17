@@ -1,105 +1,220 @@
-# Uber Data Viewer
+<div align="center">
 
-Prototype de site **100 % statique** qui affiche sous forme de tableau de bord l'export de données Uber (le zip « Uber Data Request »). Il couvre les courses, Uber Eats et le compte.
+<img src="docs/logo.svg" width="96" height="96" alt="Logo Uberewind" />
 
-**Les données ne quittent jamais le navigateur.** Il n'y a ni backend, ni base de données, ni analytics, ni CDN. La Content-Security-Policy interdit toute connexion réseau depuis la page (`connect-src 'none'`).
+# UBE<i>REWIND</i>
 
-> Non affilié à Uber Technologies Inc.
+**Rembobinez vos années Uber.** Déposez l'export officiel de vos données Uber et obtenez un tableau de bord complet (courses, Uber Eats, villes, habitudes, compte), **calculé entièrement dans votre navigateur**.
 
-## Démarrer
+[![CI](https://github.com/polo13410/Uberewind/actions/workflows/ci.yml/badge.svg)](https://github.com/polo13410/Uberewind/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/license-MIT-black.svg)](LICENSE)
+[![Privacy: 100 % local](https://img.shields.io/badge/privacy-100%25%20local-2ea44f.svg)](#-confidentialité)
+[![CSP: connect-src 'none'](https://img.shields.io/badge/CSP-connect--src%20'none'-2ea44f.svg)](csp.ts)
+[![No tracking](https://img.shields.io/badge/tracking-none-2ea44f.svg)](#-confidentialité)
+
+[![Node 26](https://img.shields.io/badge/Node-26-5FA04E?logo=nodedotjs&logoColor=white)](.nvmrc)
+[![React 19](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev)
+[![TypeScript 7](https://img.shields.io/badge/TypeScript-7-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org)
+[![Vite 8](https://img.shields.io/badge/Vite-8-646CFF?logo=vite&logoColor=white)](https://vite.dev)
+[![Recharts 3](https://img.shields.io/badge/Recharts-3-22b5bf)](https://recharts.org)
+[![d3-geo](https://img.shields.io/badge/d3--geo-3-F9A03C?logo=d3dotjs&logoColor=white)](https://d3js.org/d3-geo)
+[![Vitest](https://img.shields.io/badge/tested%20with-Vitest-6E9F18?logo=vitest&logoColor=white)](https://vitest.dev)
+[![Playwright](https://img.shields.io/badge/e2e-Playwright-2EAD33?logo=playwright&logoColor=white)](https://playwright.dev)
+[![Netlify ready](https://img.shields.io/badge/deploy-Netlify-00C7B7?logo=netlify&logoColor=white)](netlify.toml)
+
+<img src="docs/screenshots/landing.png" alt="Page d'accueil d'Uberewind" width="860" />
+
+<sub>Captures réalisées avec un export <b>entièrement fictif</b> (<code>npm run demo</code>).</sub>
+
+</div>
+
+---
+
+## Sommaire
+
+- [Fonctionnalités](#-fonctionnalités)
+- [Confidentialité](#-confidentialité)
+- [Démarrage rapide](#-démarrage-rapide)
+- [Stack technique](#-stack-technique)
+- [Architecture](#-architecture)
+- [Tests](#-tests)
+- [Déploiement (Netlify)](#-déploiement-netlify)
+- [Ajouter un type de fichier](#-ajouter-un-type-de-fichier)
+- [Limites connues](#-limites-connues)
+- [Crédits & licence](#-crédits--licence)
+
+## ✨ Fonctionnalités
+
+| Onglet | Contenu |
+|---|---|
+| **Vue d'ensemble** | KPIs (courses, km, heures en voiture, dépenses **par devise**, commandes Eats), activité par année, jour de la semaine, heure, villes |
+| **Uber Eats** | Dépenses par mois empilées par devise, **carte des villes de livraison**, top restaurants, articles favoris, mode de livraison, jours et heures, tableau des commandes filtrable et triable |
+| **Courses** | **Carte des courses** (bulles par ville, trajets départ → arrivée au zoom sur une ville), par année, villes, type de service (`Green` = `GREEN`), statuts, heures et jours, prix vs distance, notes reçues, tableau des courses |
+| **Compte** | Note passager, date d'inscription, moyens de paiement (décompte par type), adresses enregistrées, nombre de messages au support |
+
+Le site affiche aussi :
+
+- un panneau **Avertissements** : fichiers manquants, illisibles ou ignorés, lignes écartées, encodage imparfait ;
+- des onglets masqués automatiquement quand le fichier correspondant manque (export Eats seul, courses seules…).
+
+Sont acceptés en entrée le **.zip** complet, plusieurs **.csv**, ou le **dossier décompressé** glissé-déposé.
+
+<p align="center">
+  <img src="docs/screenshots/overview.png" alt="Vue d'ensemble" width="860" />
+</p>
+<p align="center">
+  <img src="docs/screenshots/rides-map.png" alt="Carte des courses" width="860" />
+</p>
+
+## 🔒 Confidentialité
+
+C'est la contrainte de conception numéro un.
+
+- **Aucun backend, aucune base de données, aucun analytics, aucun CDN.** Le site est 100 % statique et toutes les dépendances, polices comprises, sont embarquées.
+- **CSP stricte** : `default-src 'self'; connect-src 'none'; …` (voir [`csp.ts`](csp.ts)). Même un bug ne pourrait pas envoyer de données. Elle est appliquée à deux endroits : en en-tête HTTP via [`netlify.toml`](netlify.toml), et dans une balise `<meta>` injectée au build.
+- **Les cartes sont hors ligne.** Le fond de carte (formes des pays Natural Earth) et l'index des villes sont intégrés au site. Il n'y a **pas de tuiles** ni de géocodage en ligne.
+- **Les colonnes sensibles sont ignorées dès le parsing.** Chaque parseur a une **liste blanche** de colonnes, doublée d'une **liste noire** de garde-fou. Ne sont jamais lus : e-mail, téléphone, IP, IMEI, identifiants d'appareil, numéros de carte/BIN, contenu des messages et tickets. `eats_app_analytics` et `communications_*` ne sont même pas décompressés.
+- **Rien n'est persisté** : ni `localStorage`, ni IndexedDB. « Charger un autre export » ou fermer l'onglet efface tout.
+- **Vérifié automatiquement** : les tests e2e échouent si une seule requête quitte l'origine, si une violation CSP survient, ou si une valeur sensible des fixtures apparaît dans la page.
+
+## 🚀 Démarrage rapide
+
+Prérequis : **Node 26** (voir [`.nvmrc`](.nvmrc)).
 
 ```bash
-npm install          # Node 26 requis (voir .nvmrc)
-npm run dev          # http://localhost:5173
+git clone https://github.com/polo13410/Uberewind.git
+cd Uberewind
+npm install
+npm run dev            # http://localhost:5173
 ```
 
-Pour obtenir un export : app ou site Uber, puis **Compte → Confidentialité → Télécharger vos données**. Déposez ensuite le `.zip` sur la page d'accueil. Vous pouvez aussi déposer plusieurs `.csv`, ou le dossier décompressé.
-
-## Tester
+Pas d'export sous la main ? Générez-en un **fictif** :
 
 ```bash
-npm test             # Vitest : module de parsing pur (fixtures dans tests/fixtures)
-npm run test:e2e     # build + Playwright (Chromium) sur `vite preview` avec la CSP de production
-PERF=1 npm test      # en plus : test de charge sur ~60 Mo de CSV synthétiques
-npm run typecheck
+npm run demo           # → demo/uber-demo-export.zip (données inventées)
 ```
 
-- `tests/core/sample.test.ts` compare le résultat aux chiffres de référence de `sample-data/Uber Data/dashboard.html` : 68 courses terminées, ≈ 560 km, 127 commandes Eats, 322 lignes d'articles. Le test est **ignoré automatiquement** si `sample-data/` est absent. Ce dossier contient un vrai export personnel ; il est dans `.gitignore` et ne doit jamais être commité.
-- Le test e2e vérifie plusieurs choses :
-  - qu'**aucune requête ne quitte l'origine** et qu'aucune violation CSP n'apparaît ;
-  - qu'un `fetch` externe est bien bloqué ;
-  - que les valeurs sensibles des fixtures n'apparaissent pas dans le DOM ;
-  - la navigation clavier dans les onglets et la remise à zéro ;
-  - l'absence de scroll horizontal et une gouttière de 16 px à 375 px de large.
-- La première exécution de Playwright nécessite `npx playwright install chromium`.
+Pour obtenir votre vrai export : [page « Télécharger vos données » d'Uber](https://myprivacy.uber.com/exploreyourdata/download) (Compte → Confidentialité). Le lien arrive par e-mail sous quelques jours.
 
-## Déployer sur Netlify
+| Script | Rôle |
+|---|---|
+| `npm run dev` | Serveur de développement Vite |
+| `npm run build` | Typecheck + build de production dans `dist/` |
+| `npm run preview` | Sert `dist/` avec la CSP de production |
+| `npm test` | Tests unitaires et d'intégration (Vitest) |
+| `npm run test:e2e` | Build + tests navigateur (Playwright) |
+| `npm run demo` | Génère un export Uber fictif |
+| `npm run gazetteer` | Régénère l'index hors ligne des villes (Natural Earth) |
 
-Le fichier `netlify.toml` contient tout le nécessaire : `npm run build`, dossier `dist`, Node 26 (`.nvmrc`, `engines`), en-têtes de sécurité.
+## 🧱 Stack technique
 
-1. Poussez le dépôt sur GitHub, GitLab ou Bitbucket.
-2. Dans Netlify : *Add new site → Import an existing project*, puis choisissez le dépôt. Les réglages sont lus depuis `netlify.toml`.
-3. Autre possibilité, sans git : `npm run build`, puis glissez le dossier `dist/` sur <https://app.netlify.com/drop>. Dans ce cas, les en-têtes de `netlify.toml` ne s'appliquent pas, mais la CSP reste présente dans le `<meta>` injecté au build.
+| Domaine | Choix | Pourquoi |
+|---|---|---|
+| UI | **React 19** + **TypeScript 7** | Composants typés, `lazy()` pour charger graphiques et cartes à la demande |
+| Build | **Vite 8** | Build rapide ; worker ES natif ; aucun script inline (compatible CSP) |
+| Graphiques | **Recharts 3** | Composants React SVG, aucun style injecté par attribut (`style-src 'self'` strict) |
+| Cartes | **d3-geo** + **d3-zoom** + **topojson-client** + **world-atlas** (Natural Earth 1:50m) | Projection Mercator en SVG, zoom et déplacement, 100 % hors ligne |
+| Parsing CSV | **PapaParse** | Lecture ligne par ligne, guillemets multilignes, séparateur détecté |
+| Zip | **fflate** | Très léger, permet de **filtrer avant décompression** |
+| Concurrence | **Web Worker** | Le thread UI ne se fige pas (≈ 50 Mo de CSV en ≈ 3 s) |
+| Polices | **DM Sans**, **Instrument Serif** (via Fontsource, auto-hébergées) | `font-src 'self'`, aucune requête vers Google Fonts |
+| Tests | **Vitest** + **Playwright** | Module de parsing pur testé ; e2e sur le build de production |
+| Hébergement | **Netlify** (statique) | En-têtes de sécurité dans `netlify.toml` |
 
-En-têtes envoyés : `Content-Security-Policy` (voir `csp.ts`), `X-Content-Type-Options`, `X-Frame-Options: DENY`, `Referrer-Policy: no-referrer`, `Permissions-Policy`, `Cross-Origin-Opener-Policy` et `Cross-Origin-Resource-Policy`.
-
-## Architecture
+## 🏗 Architecture
 
 ```
 src/
-  core/                 Parsing pur, sans DOM, entièrement testé
-    loadExport.ts       Point d'entrée : (.zip | .csv)[] → { dataset, stats, warnings }. Ne lève jamais d'exception.
-    registry.ts         Nom de fichier → parseur (détection par nom, jamais par position)
-    parsers/*.ts        Un parseur par type de fichier, avec liste blanche de colonnes et alias
-    csv.ts              PapaParse ligne par ligne + projection sur les seules colonnes utiles
-    decode.ts           UTF-8 / UTF-16 / repli Windows-1252, décompte des caractères « � »
-    values.ts           Nombres et dates tolérants, normalisation des libellés (Green/GREEN), liste noire de colonnes
-    aggregate.ts        Statistiques des graphiques et KPIs
-  worker/parser.worker.ts   Exécute loadExport hors du thread UI
-  state/useExportLoader.ts  Cycle de vie du worker, état en mémoire seulement ; reset() efface tout
-  ui/                   React : accueil, tableau de bord (4 onglets), graphiques Recharts, tableaux
-csp.ts                  Source unique de la CSP (meta au build, en-tête de preview, vérifiée contre netlify.toml)
+├── core/                    Parsing pur, sans DOM, testé
+│   ├── loadExport.ts        (.zip | .csv)[] → { dataset, stats, warnings } ; ne lève jamais d'exception
+│   ├── registry.ts          nom de fichier → parseur (détection par nom, jamais par position)
+│   ├── parsers/             un parseur par type de fichier (liste blanche de colonnes + alias)
+│   ├── csv.ts               PapaParse ligne par ligne + projection sur les colonnes utiles
+│   ├── decode.ts            UTF-8 / UTF-16 / repli Windows-1252, décompte des « � »
+│   ├── values.ts            nombres et dates tolérants, normalisation des libellés, liste noire de colonnes
+│   └── aggregate.ts         statistiques des graphiques et KPIs
+├── geo/                     Cartographie pure, testée
+│   ├── cities.json          index hors ligne des villes (Natural Earth, domaine public)
+│   ├── gazetteer.ts         nom de ville → coordonnées (accents, homonymes)
+│   └── mapData.ts           bulles par ville, trajets départ → arrivée
+├── worker/parser.worker.ts  exécute loadExport hors du thread UI
+├── state/useExportLoader.ts cycle de vie du worker ; état en mémoire seulement
+└── ui/                      React : accueil, dashboard (4 onglets), graphiques, cartes, tableaux
+csp.ts                       source unique de la CSP (meta, preview, vérifiée contre netlify.toml)
+scripts/                     make-demo-export.mjs, build-gazetteer.mjs (outils de développement)
 ```
 
-**Flux :**
+```mermaid
+flowchart LR
+  A[".zip / .csv<br/>déposés"] -->|File objects| W
+  subgraph W["Web Worker"]
+    direction TB
+    U["fflate<br/>(filtre par nom)"] --> D["decode<br/>(UTF-8 / 1252)"] --> P["PapaParse<br/>+ liste blanche"] --> F["finalize<br/>+ aggregate"]
+  end
+  W -->|"dataset compact<br/>+ stats + warnings"| R["React (mémoire)"]
+  R --> T["Onglets, graphiques Recharts,<br/>cartes d3-geo (lazy)"]
+```
 
-1. **Dépôt.** `DropZone` transmet les objets `File` au **Web Worker** par `postMessage`. Le thread UI ne lit jamais le contenu.
-2. **Décompression.** Le worker utilise `fflate.unzipSync` avec un filtre : seuls les fichiers reconnus sont décompressés. `eats_app_analytics` (IP, IMEI…) et `communications_*` ne sont jamais décompressés.
-3. **Lecture.** Chaque fichier passe par `decode`, puis PapaParse lit les lignes une à une. À chaque ligne, seules les colonnes de la liste blanche sont copiées, puis le parseur produit des enregistrements compacts.
-4. **Finalisation et retour.** `finalizeDataset` normalise les libellés et regroupe les lignes Eats par `Order_UUID`. `computeStats` calcule les agrégats. Le worker renvoie le résultat.
-5. **Affichage.** React garde le résultat en mémoire et l'affiche. Le code des graphiques (Recharts) est chargé à la demande.
+Pour les cartes :
 
-**Confidentialité au parsing :**
-- Chaque parseur déclare une **liste blanche** de champs ; aucune autre colonne n'est lue.
-- En plus, `SENSITIVE_HEADER_RE` empêche qu'un alias résolve vers une colonne email, téléphone, IP, IMEI, appareil, carte, BIN, message, contenu, nom de famille ou coordonnées GPS.
-- Les tickets de support ne donnent que le nombre de messages et les dates. Les moyens de paiement ne donnent qu'un décompte par type.
-- Ni `localStorage` ni IndexedDB : fermer l'onglet ou cliquer sur « Charger un autre export » efface tout.
+- **Courses** : chaque ville est placée au **point médian de vos propres départs**, à partir des coordonnées de l'export. Si un départ manque, la ville est placée via l'index hors ligne.
+- **Eats** : les commandes n'ont pas de coordonnées, seulement une ville. Elles sont placées via l'**index hors ligne** (≈ 7 300 villes), avec repli sur vos courses dans la même ville.
 
-**Choix techniques :**
-- **Recharts** : composants React en SVG. Aucun style injecté par attribut, donc compatible avec `style-src 'self'` strict.
-- **fflate** : zip rapide et léger, qui permet de filtrer avant décompression.
-- **Tableaux** : affichage limité à 200 lignes avec « Afficher plus », recherche texte, filtres et tri par colonne (`aria-sort`).
+## 🧪 Tests
 
-## Ajouter un nouveau type de fichier
+```bash
+npm test               # Vitest
+npm run test:e2e       # build + Playwright (Chromium)
+PERF=1 npm test        # + test de charge (~60 Mo de CSV synthétiques)
+```
+
+- **Unitaires** : colonnes manquantes ou en trop, `Green`/`GREEN`, commande Eats multi-lignes (`Order_Price` jamais sommé), valeurs vides et nombres invalides, encodage cassé, BOM, fichiers découpés `-0`/`-1`, zip, fichiers poubelle (jamais d'exception), **confidentialité**, géocodage hors ligne, cohérence CSP / `netlify.toml`.
+- **Intégration** : `tests/core/sample.test.ts` compare le résultat à un export réel placé dans `sample-data/`. Ce dossier est **ignoré par git** et le test est sauté s'il est absent.
+- **E2E** (sur le build de production avec la vraie CSP) :
+  - aucune requête externe et aucune violation CSP ;
+  - un `fetch` externe est bien bloqué ;
+  - cartes, navigation clavier dans les onglets et remise à zéro ;
+  - aucun scroll horizontal et une gouttière de 16 px à 375 px.
+- **CI** : GitHub Actions lance le typecheck, Vitest, le build et Playwright à chaque push ([`ci.yml`](.github/workflows/ci.yml)).
+
+## ☁️ Déploiement (Netlify)
+
+Tout est dans [`netlify.toml`](netlify.toml) : `npm run build`, dossier `dist`, Node 26 et les en-têtes de sécurité (CSP, `X-Frame-Options`, `Referrer-Policy: no-referrer`, `Permissions-Policy`, COOP/CORP).
+
+1. Netlify → *Add new site → Import an existing project*, puis choisissez ce dépôt. Les réglages sont lus automatiquement.
+2. Autre possibilité, sans git : `npm run build`, puis glissez `dist/` sur <https://app.netlify.com/drop>. Dans ce cas, la CSP reste active via la balise `<meta>`.
+
+## 🧩 Ajouter un type de fichier
 
 Exemple : `driver_lifetime_trips-*.csv`.
 
 1. **Modèle.** Dans `src/core/types.ts`, ajoutez le type d'enregistrement et un champ dans `Dataset` (`null` signifie « fichier absent »).
-2. **Builder.** Dans `src/core/builder.ts`, ajoutez l'accumulateur correspondant.
+2. **Builder.** Dans `src/core/builder.ts`, ajoutez l'accumulateur.
 3. **Parseur.** Dans `src/core/parsers/`, écrivez `parseX(text, ctx, builder)` :
-   - déclarez la liste blanche `FIELDS` (`{ key, aliases: [...] }`, alias par ordre de priorité, comparés après normalisation casse/espaces/BOM) ;
-   - appelez `readCsv(text, ctx, { fields, onHeader, onRow })` ;
-   - signalez les problèmes avec `ctx.warn(level, message)`, sans jamais lever d'exception.
-4. **Registre.** Dans `src/core/registry.ts`, ajoutez une entrée à `FILE_SPECS` : `{ id, label, pattern: re('driver_lifetime_trips'), parse: parseX }`. Le motif accepte automatiquement les suffixes `-0`, `-1`…
-5. **Finalisation.** Dans `src/core/loadExport.ts`, recopiez le builder vers le `Dataset` dans `finalizeDataset`. Ajoutez au besoin des agrégats dans `aggregate.ts`.
-6. **Tests.** Ajoutez une fixture minuscule dans `tests/fixtures/` et un test dans `tests/core/`. Pensez à un cas de colonnes manquantes et à un cas de confidentialité.
-7. **Interface.** Ajoutez un onglet ou une carte dans `src/ui/`. L'onglet doit être masqué quand la donnée vaut `null`.
+   - déclarez la liste blanche `FIELDS` (`{ key, aliases: [...] }`) ;
+   - appelez `readCsv(...)` ;
+   - signalez les problèmes avec `ctx.warn(...)`, sans jamais lever d'exception.
+4. **Registre.** Dans `src/core/registry.ts`, ajoutez `{ id, label, pattern: re('driver_lifetime_trips'), parse }` à `FILE_SPECS`. Les suffixes `-0`, `-1`… sont acceptés automatiquement.
+5. **Finalisation.** Dans `src/core/loadExport.ts` (`finalizeDataset`), recopiez le builder vers le `Dataset`, puis ajoutez les agrégats dans `aggregate.ts`.
+6. **Tests.** Ajoutez une fixture **fictive** dans `tests/fixtures/` et un test dans `tests/core/`, avec un cas de colonnes manquantes et un cas de confidentialité.
+7. **Interface.** Ajoutez un onglet ou une carte dans `src/ui/`, masqué quand la donnée vaut `null`.
 
-## Limites connues
+## ⚠️ Limites connues
 
-- Les formats ont été validés sur **un seul export réel** (rider et eater, 2026, en anglais). Les alias de l'ancien format `trips_data.csv` sont fournis au mieux, sans test sur données réelles. Les exports chauffeur (driver) ne sont pas gérés : ils sont listés comme « non reconnus ».
+- Les formats ont été validés sur un seul export réel (rider et eater, 2026, en anglais). L'ancien format `trips_data.csv` est lu au mieux, et les exports chauffeur ne sont pas gérés.
+- **Cartes sans fond de rue** : le choix « zéro requête réseau » exclut les tuiles. Les trajets d'une ville sont tracés sur fond neutre, avec une échelle kilométrique.
+- Il n'y a pas de conversion de devises. Le graphique mensuel empile les devises, et un sélecteur permet d'en isoler une.
 - Les heures sont affichées telles qu'Uber les fournit (`*_local`), sans conversion de fuseau.
-- Les dépenses ne sont pas converties entre devises. Le graphique empilé « Dépenses par mois » additionne visuellement des devises différentes ; un sélecteur permet d'isoler une devise.
-- Les dépenses de courses reprennent `original_fare_local` des courses terminées : hors pourboire, sans frais d'annulation.
-- Le bundle de la page d'accueil fait ≈ 230 Ko (72 Ko gzip) ; les graphiques ajoutent ≈ 460 Ko (130 Ko gzip), chargés après le dépôt.
-- Sur ~50 Mo de CSV, l'affichage prend ≈ 3 s, et la réception du résultat fige l'UI ≈ 0,2 s (clonage structuré). Au-delà de ~300 Mo par fichier, le fichier est ignoré avec un avertissement.
+- Poids (gzip) :
+  - accueil ≈ 75 Ko ;
+  - tableau de bord ≈ 130 Ko, chargé après le dépôt ;
+  - cartes ≈ 400 Ko, chargées à l'ouverture d'un onglet avec carte.
+- `npm audit` signale une ReDoS dans `picomatch` (dépendance de **build** de Vite et Vitest, non embarquée dans le site). Aucun correctif amont n'existe à ce jour.
+
+## 🙏 Crédits & licence
+
+- Code sous licence [MIT](LICENSE).
+- Fond de carte et index des villes : [Natural Earth](https://www.naturalearthdata.com/) (domaine public), via [world-atlas](https://github.com/topojson/world-atlas) (ISC).
+- Polices : [DM Sans](https://fonts.google.com/specimen/DM+Sans) et [Instrument Serif](https://fonts.google.com/specimen/Instrument+Serif) (SIL Open Font License), via [Fontsource](https://fontsource.org).
+
+> **Uberewind n'est pas affilié à Uber Technologies Inc.** « Uber » et « Uber Eats » sont des marques de leurs propriétaires respectifs. Ce projet lit uniquement l'export que chaque utilisateur obtient légalement de ses propres données.

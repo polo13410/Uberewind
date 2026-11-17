@@ -30,6 +30,9 @@ export interface Trip {
   fare: number | null;
   from: string | null;
   to: string | null;
+  /** Pick-up / drop-off position `[lat, lng]`, used only by the on-device map. */
+  pickup: [number, number] | null;
+  dropoffAt: [number, number] | null;
 }
 
 export interface EatsItem {

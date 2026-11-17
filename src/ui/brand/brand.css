@@ -1,0 +1,370 @@
+/* =====================================================================
+   Brand: wordmark, landing hero, drop zone, footer
+   ===================================================================== */
+:root {
+  --rewind-a: #ff7a3d;
+  --rewind-b: #ff3d7f;
+}
+
+.logo {
+  flex: none;
+  display: block;
+}
+
+.wordmark {
+  display: inline-flex;
+  align-items: baseline;
+  line-height: 1;
+  white-space: nowrap;
+}
+
+.wm-ube {
+  font-family: 'DM Sans', system-ui, sans-serif;
+  font-weight: 700;
+  letter-spacing: -0.04em;
+}
+
+.wm-rewind {
+  font-family: 'Instrument Serif', Georgia, serif;
+  font-style: italic;
+  font-weight: 400;
+  letter-spacing: -0.01em;
+  padding-right: 0.08em; /* italic overhang */
+  background: linear-gradient(100deg, var(--rewind-a), var(--rewind-b));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.wordmark-sm {
+  font-size: 15px;
+  margin-bottom: 2px;
+}
+
+.wordmark-sm .wm-rewind {
+  font-size: 1.12em;
+}
+
+.brand-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+.brand-row .logo {
+  border-radius: 10px;
+}
+
+/* ---------- Page shell ---------- */
+.page {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.page > :first-child {
+  flex: 1 0 auto;
+}
+
+/* The landing is always dark: it is the product's "cover". */
+.page-hero {
+  color-scheme: dark;
+  background:
+    radial-gradient(60rem 30rem at 50% -10%, rgb(255 90 80 / 0.16), transparent 70%),
+    radial-gradient(40rem 26rem at 90% 110%, rgb(80 120 255 / 0.1), transparent 70%),
+    #050505;
+  color: #f3f3f1;
+  --tx: #f3f3f1;
+  --mu: #a7a7a1;
+  --bd: #2a2a28;
+  --card: #111111;
+  --accent: #ff7a3d;
+  --focus: #ffb38f;
+}
+
+.hero {
+  display: flex;
+  flex-direction: column;
+  padding: 0 16px;
+}
+
+.hero-nav {
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 0;
+}
+
+.hero-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+}
+
+.hero-brand .logo {
+  border-radius: 8px;
+}
+
+.hero-gh {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: inherit;
+  text-decoration: none;
+  padding: 7px 14px;
+  border: 1px solid var(--bd);
+  border-radius: 999px;
+  transition: border-color 0.15s, background-color 0.15s;
+}
+
+.hero-gh:hover {
+  border-color: #555;
+  background: rgb(255 255 255 / 0.04);
+}
+
+.hero-main {
+  width: 100%;
+  max-width: 760px;
+  margin: 0 auto;
+  padding: clamp(24px, 7vh, 72px) 0 40px;
+  text-align: center;
+}
+
+.hero-title {
+  margin: 0;
+  font-size: clamp(44px, 13vw, 112px);
+  justify-content: center;
+}
+
+.hero-title .wm-ube {
+  color: #ffffff;
+}
+
+.hero-title .wm-rewind {
+  font-size: 1.13em;
+}
+
+.hero-tagline {
+  margin: 14px auto 36px;
+  max-width: 560px;
+  font-size: clamp(16px, 2.2vw, 19px);
+  color: var(--mu);
+}
+
+/* ---------- Drop zone: the call to action ---------- */
+.dropzone {
+  position: relative;
+  border-radius: 22px;
+  padding: clamp(32px, 6vw, 56px) 20px;
+  background: linear-gradient(180deg, rgb(255 255 255 / 0.045), rgb(255 255 255 / 0.015));
+  border: 2px dashed rgb(255 255 255 / 0.22);
+  cursor: pointer;
+  transition: border-color 0.2s, background-color 0.2s, transform 0.2s, box-shadow 0.2s;
+}
+
+.dropzone:hover,
+.dropzone:focus-visible {
+  border-color: var(--rewind-a);
+  box-shadow: 0 0 0 6px rgb(255 122 61 / 0.12), 0 20px 60px -20px rgb(255 61 127 / 0.35);
+  outline: none;
+}
+
+.dropzone.is-over {
+  border-style: solid;
+  border-color: var(--rewind-b);
+  background: rgb(255 61 127 / 0.08);
+  transform: scale(1.015);
+  box-shadow: 0 0 0 8px rgb(255 61 127 / 0.14), 0 24px 80px -20px rgb(255 61 127 / 0.5);
+}
+
+.dropzone.is-loading {
+  cursor: progress;
+  border-style: solid;
+  border-color: var(--rewind-a);
+}
+
+.dz-body {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+}
+
+.dz-icon {
+  width: 52px;
+  height: 52px;
+  color: var(--rewind-a);
+  margin-bottom: 8px;
+}
+
+.dropzone.is-over .dz-icon {
+  color: var(--rewind-b);
+}
+
+.dz-title {
+  margin: 0;
+  font-size: clamp(19px, 3vw, 24px);
+  font-weight: 700;
+  letter-spacing: -0.01em;
+}
+
+.dz-sub {
+  margin: 0;
+  color: var(--mu);
+  font-size: 14px;
+}
+
+.dz-cta {
+  margin-top: 18px;
+  display: inline-block;
+  padding: 12px 26px;
+  border-radius: 999px;
+  font-weight: 700;
+  color: #0b0b0b;
+  background: linear-gradient(100deg, var(--rewind-a), var(--rewind-b));
+  box-shadow: 0 8px 24px -8px rgb(255 61 127 / 0.6);
+}
+
+.dz-error {
+  margin: 12px 0 0;
+  color: #ffb4b4;
+  font-size: 14px;
+}
+
+.dropzone .spinner {
+  width: 32px;
+  height: 32px;
+  border-color: #333;
+  border-top-color: var(--rewind-a);
+  margin-bottom: 8px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dropzone,
+  .dropzone.is-over {
+    transition: none;
+    transform: none;
+  }
+}
+
+/* ---------- Trust row ---------- */
+.trust {
+  list-style: none;
+  padding: 0;
+  margin: 18px 0 0;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 22px;
+  font-size: 14px;
+  color: var(--mu);
+}
+
+.trust li,
+.trust a {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.trust a {
+  color: #f3f3f1;
+  text-underline-offset: 3px;
+}
+
+/* ---------- Steps ---------- */
+.hero-steps {
+  list-style: none;
+  padding: 0;
+  margin: 56px 0 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+  gap: 14px;
+  text-align: left;
+}
+
+.hero-steps li {
+  display: flex;
+  gap: 14px;
+  padding: 18px;
+  border: 1px solid var(--bd);
+  border-radius: 16px;
+  background: rgb(255 255 255 / 0.025);
+}
+
+.step-n {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  font-weight: 700;
+  color: #0b0b0b;
+  background: #f3f3f1;
+}
+
+.hero-steps h2 {
+  margin: 4px 0;
+  font-size: 16px;
+}
+
+.hero-steps p {
+  margin: 0;
+  font-size: 14px;
+  color: var(--mu);
+}
+
+.hero-steps a {
+  color: #f3f3f1;
+  text-underline-offset: 3px;
+}
+
+.hero-privacy {
+  margin: 28px auto 0;
+  text-align: left;
+  font-size: 14px;
+  color: var(--mu);
+  max-width: 640px;
+}
+
+.hero-privacy summary {
+  cursor: pointer;
+  text-align: center;
+  color: #d7d7d2;
+}
+
+.hero-privacy ul {
+  margin: 12px 0 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 6px;
+}
+
+.page-hero .notice {
+  text-align: left;
+}
+
+/* ---------- Footer (compact, one line) ---------- */
+.site-footer {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 4px 10px;
+  padding: 14px 16px;
+  font-size: 12px;
+  color: var(--mu);
+  border-top: 1px solid var(--bd);
+}
+
+.site-footer a {
+  color: inherit;
+}

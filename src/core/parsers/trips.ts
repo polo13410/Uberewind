@@ -3,6 +3,14 @@ import type { ParseContext } from '../context';
 import { readCsv, type FieldSpec } from '../csv';
 import { normalizeCurrency, normalizeStatus, parseLocalTimestamp, parseNumber, secondsBetween } from '../values';
 
+/** Valid [lat, lng] rounded to ~11 m, or null (missing, out of range, or the 0,0 placeholder). */
+export function parseCoord(lat: string | null, lng: string | null): [number, number] | null {
+  const a = parseNumber(lat).value;
+  const b = parseNumber(lng).value;
+  if (a == null || b == null || Math.abs(a) > 90 || Math.abs(b) > 180 || (a === 0 && b === 0)) return null;
+  return [Math.round(a * 1e4) / 1e4, Math.round(b * 1e4) / 1e4];
+}
+
 const MILES_TO_KM = 1.609344;
 
 /**
@@ -23,6 +31,11 @@ const FIELDS = [
   { key: 'duration', aliases: ['trip_duration_seconds'] },
   { key: 'status', aliases: ['status', 'trip_or_order_status', 'trip_status'] },
   { key: 'fare', aliases: ['original_fare_local', 'fare_amount', 'fare'] },
+  // Coordinates are used only for the on-device map (no tiles, no network).
+  { key: 'pLat', aliases: ['begintrip_lat', 'begin_trip_lat'] },
+  { key: 'pLng', aliases: ['begintrip_lng', 'begin_trip_lng'] },
+  { key: 'dLat', aliases: ['dropoff_lat'] },
+  { key: 'dLng', aliases: ['dropoff_lng'] },
 ] as const satisfies readonly FieldSpec[];
 
 type Key = (typeof FIELDS)[number]['key'];
@@ -68,6 +81,8 @@ export function parseTrips(text: string, ctx: ParseContext, b: DatasetBuilder): 
         fare: fare.value,
         from: row.from,
         to: row.to,
+        pickup: parseCoord(row.pLat, row.pLng),
+        dropoffAt: parseCoord(row.dLat, row.dLng),
       });
     },
   });

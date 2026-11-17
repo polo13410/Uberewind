@@ -13,5 +13,5 @@
     "verbatimModuleSyntax": true,
     "allowImportingTsExtensions": true
   },
-  "include": ["vite.config.ts", "csp.ts", "playwright.config.ts", "tests"]
+  "include": ["vite.config.ts", "csp.ts", "playwright.config.ts", "tests", "scripts/*.d.mts"]
 }
