@@ -60,8 +60,8 @@ const TABS = ['Vue d’ensemble', 'Uber Eats', 'Courses', 'Compte'];
 test('no external request and no CSP violation, before and after loading an export', async ({ page, baseURL }) => {
   const w = await watch(page);
   await page.goto('/');
-  await expect(page.getByText('Vos données restent sur votre appareil').first()).toBeVisible();
-  await expect(page.getByText(/Non affilié à Uber/)).toBeVisible();
+  await expect(page.getByText(/lues uniquement dans votre navigateur/)).toBeVisible();
+  await expect(page.getByText(/non affilié à Uber/)).toBeVisible();
 
   await upload(page, 'export.zip', syntheticZip());
   for (const name of TABS) {
@@ -149,7 +149,7 @@ test('landing call to action and outbound links', async ({ page }) => {
   await dz.focus();
   await page.keyboard.press('Enter');
   await chooser;
-  await expect(page.getByRole('link', { name: /vérifiez le code/ })).toHaveAttribute('href', 'https://github.com/polo13410/Uberewind');
+  await expect(page.getByRole('link', { name: /code est entièrement open source/ })).toHaveAttribute('href', 'https://github.com/polo13410/Uberewind');
   await expect(page.getByRole('link', { name: /Télécharger vos données/ })).toHaveAttribute('href', /myprivacy\.uber\.com/);
 });
 
@@ -211,7 +211,7 @@ test('street tiles: opt-in with consent, OpenStreetMap images only, nothing else
   await expect(toggle).toHaveAttribute('aria-pressed', 'false');
   await toggle.click();
   const dialog = page.getByRole('dialog', { name: 'Afficher les rues ?' });
-  await expect(dialog).toContainText('aucune de vos données Uber');
+  await expect(dialog).toContainText('rien de votre export');
   // Cancel → still nothing requested.
   await dialog.getByRole('button', { name: 'Annuler' }).click();
   await page.waitForTimeout(300);

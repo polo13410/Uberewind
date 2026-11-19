@@ -43,7 +43,7 @@ export function Account({ result }: { result: LoadResult }) {
         {payments && (
           <ChartCard
             title="Moyens de paiement enregistrés"
-            sub="Par type — aucun numéro de carte n’est lu"
+            sub="Par type (les numéros de carte ne sont pas lus)"
             data={{ headers: ['Type', 'Nombre'], rows: payItems.map((p) => [paymentLabel(p.key), p.count]) }}
           >
             <HBarChart items={payItems} label={paymentLabel} />

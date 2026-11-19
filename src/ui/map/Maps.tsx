@@ -34,11 +34,10 @@ function StreetsConsent({ onAccept, onCancel }: { onAccept: () => void; onCancel
         Afficher les rues ?
       </p>
       <p id={`${id}-d`}>
-        Les rues viennent des serveurs d’<b>OpenStreetMap</b>. Pour les afficher, votre navigateur télécharge des
-        images de la <b>zone affichée</b> : OpenStreetMap reçoit donc la zone regardée, votre adresse IP et le nom de ce
-        site,{' '}
-        <b>mais aucune de vos données Uber</b> (ni trajets, ni dates, ni montants). Rien n’est mémorisé : l’option est
-        désactivée à chaque nouvelle visite.
+        Les rues viennent des serveurs d’OpenStreetMap. Pour les afficher, votre navigateur leur demande les images de
+        la zone que vous regardez. OpenStreetMap voit donc cette zone, votre adresse IP et le nom de ce site, mais rien
+        de votre export (ni trajets, ni dates, ni montants). Ce choix n’est pas retenu, l’option sera de nouveau
+        désactivée à votre prochaine visite.
       </p>
       <div className="consent-actions">
         <button type="button" className="btn btn-primary" onClick={onAccept} autoFocus>
@@ -125,8 +124,8 @@ function MapCard({ title, sub, layer, segments, describe, colorIndex, unit, allo
         {layer.unresolved.length > 0 && <>Non localisées : {layer.unresolved.join(', ')}. </>}
         Ctrl + molette ou pincement pour zoomer, glisser pour déplacer.{' '}
         {streets
-          ? 'Rues : © les contributeurs OpenStreetMap (chargées à votre demande).'
-          : 'Fond de carte Natural Earth intégré au site (lacs, fleuves, villes et grands axes au zoom) : aucune requête réseau.'}
+          ? 'Rues © les contributeurs OpenStreetMap, chargées à votre demande.'
+          : 'Fond de carte Natural Earth inclus dans le site, sans connexion. Les lacs, fleuves et grands axes apparaissent en zoomant.'}
       </p>
     </ChartCard>
   );

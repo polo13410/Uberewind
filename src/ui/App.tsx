@@ -35,12 +35,10 @@ export function App() {
         <Landing onFiles={load} loading={state.status === 'loading' ? state.message : undefined} />
       )}
       <footer className="site-footer">
-        <span>Non affilié à Uber</span>
-        <span aria-hidden="true">·</span>
-        <span>Aucune donnée envoyée ni stockée</span>
+        <span>Projet indépendant, non affilié à Uber</span>
         <span aria-hidden="true">·</span>
         <a href={REPO_URL} target="_blank" rel="noopener noreferrer">
-          Open source (MIT)
+          Code source (licence MIT)
         </a>
       </footer>
     </div>

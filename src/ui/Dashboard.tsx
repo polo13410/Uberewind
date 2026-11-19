@@ -78,8 +78,8 @@ export function Dashboard({ result, onReset }: { result: LoadResult; onReset: ()
           <div className="notice">
             <h2>Aucune donnée exploitable</h2>
             <p>
-              Aucun des fichiers déposés n’a pu être interprété. Vérifiez qu’il s’agit bien de l’export « Uber Data
-              Request » (fichier .zip), puis réessayez. Le détail est indiqué dans les avertissements ci-dessus.
+              Aucun des fichiers déposés n’a pu être lu. Il faut le fichier .zip envoyé par Uber (« Uber Data
+              Request »). Les avertissements ci-dessus indiquent ce qui a posé problème.
             </p>
             <button type="button" className="btn btn-primary" onClick={onReset}>
               Réessayer
