@@ -1,10 +1,10 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import type { EatsOrder, Trip } from '../../core/types';
 import rows from '../../geo/cities.json';
 import { buildGazetteer, type GazetteerRow } from '../../geo/gazetteer';
 import { eatsCities, rideCities, tripSegments, type MapLayer, type Segment } from '../../geo/mapData';
 import { ChartCard, Empty } from '../components/Charts';
-import { plural } from '../format';
+import { fmtDateTime, fmtInt, fmtMoney, fmtNum, plural } from '../format';
 import { GeoMap } from './GeoMap';
 
 // Built once, the first time a map is shown (this module is lazy-loaded).
@@ -20,9 +20,40 @@ interface MapCardProps {
   unit: string;
   /** Draw OpenStreetMap street tiles under the data. */
   streets?: boolean;
+  segmentTooltip?: (s: Segment) => ReactNode;
 }
 
-function MapCard({ title, sub, layer, segments, describe, colorIndex, unit, streets = false }: MapCardProps) {
+/** Hover tooltip of one trip line. */
+function tripTooltip({ trip: t }: Segment) {
+  const meta = [
+    t.km != null ? `${fmtNum(t.km, 1)} km` : null,
+    t.durationSec != null ? `${fmtInt(t.durationSec / 60)} min` : null,
+    t.fare != null && t.currency ? fmtMoney(t.fare, t.currency) : null,
+  ].filter(Boolean);
+  return (
+    <>
+      <div className="tt-title">
+        {fmtDateTime(t.t)}
+        {t.product ? ` · ${t.product}` : ''}
+      </div>
+      <div className="tt-row">
+        <i className="k-start" />
+        <span>
+          <b>Départ</b> {t.from ?? '—'}
+        </span>
+      </div>
+      <div className="tt-row">
+        <i className="k-end" />
+        <span>
+          <b>Arrivée</b> {t.to ?? '—'}
+        </span>
+      </div>
+      {meta.length > 0 && <div className="tt-meta">{meta.join(' · ')}</div>}
+    </>
+  );
+}
+
+function MapCard({ title, sub, layer, segments, describe, colorIndex, unit, streets = false, segmentTooltip }: MapCardProps) {
   const [focusName, setFocusName] = useState<string | null>(null);
   const focus = layer.cities.find((c) => c.name === focusName) ?? null;
 
@@ -53,6 +84,7 @@ function MapCard({ title, sub, layer, segments, describe, colorIndex, unit, stre
       {layer.cities.length ? (
         <GeoMap
           streets={streets}
+          segmentTooltip={segmentTooltip}
           cities={layer.cities}
           segments={segments}
           focus={focus}
@@ -86,12 +118,13 @@ export function RidesMap({ trips }: { trips: readonly Trip[] }) {
       title="Carte des courses"
       sub={
         segments.length
-          ? 'Une bulle par ville (taille = nombre de courses). Choisissez une ville pour voir vos trajets.'
+          ? 'Une bulle par ville (taille = nombre de courses). Choisissez une ville pour voir vos trajets, survolez-en un pour le détail.'
           : 'Une bulle par ville (taille = nombre de courses).'
       }
       layer={layer}
       segments={segments}
       streets
+      segmentTooltip={tripTooltip}
       describe={(n) => plural(n, 'course', 'courses')}
       unit="Courses"
     />

@@ -181,7 +181,22 @@ test('maps: rides and Eats, city focus, no request besides street tiles', async 
   // Focus a city: its trips are drawn.
   await page.getByRole('combobox', { name: 'Centrer sur' }).selectOption('Paris');
   await expect(page.locator('.map-trips line').first()).toBeAttached();
-  await expect(page.locator('.map-key')).toContainText('arrivée');
+  await expect(page.locator('.map-key')).toContainText('Départ');
+  await expect(page.locator('.map-key')).toContainText('Arrivée');
+  // The focused city's bubble is hidden so it does not cover its trips.
+  await expect(ridesMap.getByRole('button', { name: /^Paris :/ })).toHaveCount(0);
+
+  // Hovering a trip shows its details and fades the other trips.
+  await page.locator('.map-hits line').first().hover({ force: true });
+  const tip = page.locator('.map-tooltip.is-trip');
+  await expect(tip).toBeVisible();
+  await expect(tip).toContainText('Départ');
+  await expect(tip).toContainText('Arrivée');
+  await expect(page.locator('.map-trips.has-hover')).toHaveCount(1);
+  await expect(page.locator('.map-trip-hi line')).toHaveCount(1);
+  await page.mouse.move(0, 0);
+  await expect(tip).toHaveCount(0);
+  await expect(page.locator('.map-trips.has-hover')).toHaveCount(0);
 
   await page.getByRole('tab', { name: 'Uber Eats' }).click();
   const eatsMap = page.getByRole('img', { name: /^Carte des commandes/ });
