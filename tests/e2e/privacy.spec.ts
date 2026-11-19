@@ -249,6 +249,47 @@ test('rides map: OpenStreetMap street tiles, images only, nothing else', async (
 
 });
 
+test('Ctrl + one mouse-wheel notch zooms gently (no ×4 jump)', async ({ page }) => {
+  await page.goto('/');
+  await upload(page, 'demo.zip', Buffer.from(makeDemoExport()));
+  await page.getByRole('tab', { name: 'Courses' }).click();
+  const svg = page.locator('svg.map-svg').first();
+  const box = (await svg.boundingBox())!;
+  await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+  await page.keyboard.down('Control');
+  await page.mouse.wheel(0, -100);
+  await page.keyboard.up('Control');
+  const layer = svg.locator(':scope > g');
+  await expect(layer).not.toHaveAttribute('transform', /scale\(1\)$/);
+  const k = Number((await layer.getAttribute('transform'))!.match(/scale\(([\d.]+)\)/)![1]);
+  expect(k).toBeGreaterThan(1.2);
+  expect(k).toBeLessThan(1.4);
+});
+
+test('street tiles: the previous zoom level stays drawn while the next one loads', async ({ page }) => {
+  // Slow tiles, so the in-between state can be observed.
+  await page.route(/tile\.openstreetmap\.org/, async (route) => {
+    await new Promise((r) => setTimeout(r, 400));
+    return route.fulfill({ status: 200, contentType: 'image/png', body: PNG });
+  });
+  await page.goto('/');
+  await upload(page, 'demo.zip', Buffer.from(makeDemoExport()));
+  await page.getByRole('tab', { name: 'Courses' }).click();
+  await page.getByRole('combobox', { name: 'Centrer sur' }).selectOption('Paris');
+  const tiles = page.locator('.map-tiles img:not(.is-back)');
+  await expect(tiles.first()).toBeAttached();
+  await expect.poll(async () => (await tiles.count()) - (await page.locator('.map-tiles img.is-loaded').count())).toBe(0);
+
+  const zoomIn = page.getByRole('button', { name: 'Zoomer', exact: true }).first();
+  await zoomIn.click();
+  await zoomIn.click();
+  // New level loading: the old tiles are kept underneath, no blank map.
+  await expect(page.locator('.map-tiles img.is-back').first()).toBeAttached();
+  // Once every new tile is in, the backdrop goes away.
+  await expect(page.locator('.map-tiles img.is-back')).toHaveCount(0, { timeout: 5000 });
+  expect(await page.locator('.map-tiles img.is-loaded').count()).toBe(await tiles.count());
+});
+
 test('map zoom and pan stick (no snap back) on both maps', async ({ page }) => {
   await page.goto('/');
   await upload(page, 'demo.zip', Buffer.from(makeDemoExport()));
@@ -258,8 +299,11 @@ test('map zoom and pan stick (no snap back) on both maps', async ({ page }) => {
     const layer = map.locator('svg.map-svg > g');
     await expect(layer).toHaveAttribute('transform', 'translate(0,0) scale(1)');
 
+    // Two quick clicks chain into one smooth zoom (×1.6²), reached after the animation.
     await map.getByRole('button', { name: 'Zoomer', exact: true }).click();
     await map.getByRole('button', { name: 'Zoomer', exact: true }).click();
+    await expect(layer).not.toHaveAttribute('transform', /scale\(1\)$/);
+    await expect(layer).toHaveAttribute('transform', /scale\(2\.56\d*\)$/);
     const box = (await map.locator('svg.map-svg').boundingBox())!;
     await page.mouse.move(box.x + box.width / 3, box.y + box.height / 2);
     await page.mouse.down();

@@ -338,6 +338,20 @@
   position: absolute;
   max-width: none;
   user-select: none;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+/* A new tile fades in over the previous zoom level (kept underneath until all are loaded). */
+.map-tiles img.is-loaded,
+.map-tiles img.is-back {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .map-tiles img {
+    transition: none;
+  }
 }
 
 /* OSM only ships a light style: invert it softly in dark mode. */
