@@ -87,11 +87,6 @@ export function Landing({ onFiles, loading }: { onFiles: (f: File[]) => void; lo
               Rien n’est sauvegardé. Les données restent en mémoire le temps de la visite et disparaissent quand vous
               fermez l’onglet ou chargez un autre export.
             </li>
-            <li>
-              Sur la carte des courses, les rues sont des images téléchargées depuis OpenStreetMap pour la zone
-              affichée. OpenStreetMap ne reçoit que ces demandes d’images et votre adresse IP, rien de votre export.
-              La carte des commandes Uber Eats est dessinée à partir de fichiers inclus dans le site, sans connexion.
-            </li>
           </ul>
         </details>
       </main>
