@@ -1,7 +1,8 @@
 /**
  * End-to-end checks on the production build (served by `vite preview` with the
  * same CSP header as Netlify):
- *  - no request ever leaves the origin, before or after loading an export;
+ *  - no request ever leaves the origin, before or after loading an export, except
+ *    OpenStreetMap tile images on the rides map (stubbed here, never the real server);
  *  - no CSP violation;
  *  - the four tabs render, keyboard navigation works, no horizontal scroll on mobile;
  *  - "Charger un autre export" resets the state.
@@ -57,6 +58,22 @@ async function upload(page: Page, name: string, buffer: Buffer) {
 
 const TABS = ['Vue d’ensemble', 'Uber Eats', 'Courses', 'Compte'];
 
+/** The only external URL the app may load: an OpenStreetMap tile image. */
+const OSM_TILE = /^https:\/\/tile\.openstreetmap\.org\/\d+\/\d+\/\d+\.png$/;
+const PNG = Buffer.from(
+  'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=',
+  'base64',
+);
+
+/** Requests leaving the origin, other than street tiles. */
+const external = (requests: string[], baseURL: string) =>
+  requests.filter((u) => !u.startsWith(baseURL) && !u.startsWith('data:') && !u.startsWith('blob:') && !OSM_TILE.test(u));
+
+// Serve tiles locally so no test depends on (or calls) the real provider.
+test.beforeEach(async ({ page }) => {
+  await page.route(/tile\.openstreetmap\.org/, (route) => route.fulfill({ status: 200, contentType: 'image/png', body: PNG }));
+});
+
 test('no external request and no CSP violation, before and after loading an export', async ({ page, baseURL }) => {
   const w = await watch(page);
   await page.goto('/');
@@ -70,8 +87,7 @@ test('no external request and no CSP violation, before and after loading an expo
     await expect(page.locator('[role=tabpanel] .card').first()).toBeVisible();
   }
 
-  const external = w.requests.filter((u) => !u.startsWith(baseURL!) && !u.startsWith('data:') && !u.startsWith('blob:'));
-  expect(external, 'requests leaving the origin').toEqual([]);
+  expect(external(w.requests, baseURL!), 'requests leaving the origin').toEqual([]);
   expect(await w.cspViolations()).toEqual([]);
 
   // Sensitive values from the fixtures are never rendered.
@@ -153,7 +169,7 @@ test('landing call to action and outbound links', async ({ page }) => {
   await expect(page.getByRole('link', { name: /Télécharger vos données/ })).toHaveAttribute('href', /myprivacy\.uber\.com/);
 });
 
-test('offline maps: rides and Eats, city focus, no network', async ({ page, baseURL }) => {
+test('maps: rides and Eats, city focus, no request besides street tiles', async ({ page, baseURL }) => {
   const w = await watch(page);
   await page.goto('/');
   await upload(page, 'demo.zip', Buffer.from(makeDemoExport()));
@@ -170,73 +186,52 @@ test('offline maps: rides and Eats, city focus, no network', async ({ page, base
   await page.getByRole('tab', { name: 'Uber Eats' }).click();
   const eatsMap = page.getByRole('img', { name: /^Carte des commandes/ });
   await expect(eatsMap.getByRole('button', { name: /^Lausanne : \d+ commandes$/ })).toBeVisible();
+  // The Eats map has no street tiles.
+  await expect(page.locator('.map-tiles')).toHaveCount(0);
 
-  expect(w.requests.filter((u) => !u.startsWith(baseURL!))).toEqual([]);
+  expect(external(w.requests, baseURL!)).toEqual([]);
   expect(await w.cspViolations()).toEqual([]);
 });
 
-test('city focus draws the offline orientation layer, still without any request', async ({ page, baseURL }) => {
+test('Eats map: city focus draws the offline orientation layer, without any request', async ({ page, baseURL }) => {
   const w = await watch(page);
   await page.goto('/');
   await upload(page, 'demo.zip', Buffer.from(makeDemoExport()));
-  await page.getByRole('tab', { name: 'Courses' }).click();
-  await page.getByRole('combobox', { name: 'Centrer sur' }).selectOption('Paris');
+  await page.getByRole('tab', { name: 'Uber Eats' }).click();
+  await page.getByRole('combobox', { name: 'Centrer sur' }).selectOption('Lausanne');
   const roads = page.locator('.map-basemap .bm-road');
   await expect(roads).toHaveAttribute('d', /^M/);
   await expect(page.locator('.map-basemap .bm-urban')).toHaveAttribute('d', /^M/);
+  await expect(page.locator('.map-tiles')).toHaveCount(0);
   expect(w.requests.filter((u) => !u.startsWith(baseURL!))).toEqual([]);
   expect(await w.cspViolations()).toEqual([]);
 });
 
-test('street tiles: opt-in with consent, OpenStreetMap images only, nothing else', async ({ page, baseURL }) => {
-  // Serve tiles locally so the test never depends on (or calls) the real provider.
-  const png = Buffer.from(
-    'iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=',
-    'base64',
-  );
+test('rides map: OpenStreetMap street tiles, images only, nothing else', async ({ page, baseURL }) => {
   const tileHits: string[] = [];
   const referers: string[] = [];
   await page.route(/tile\.openstreetmap\.org/, (route) => {
     tileHits.push(route.request().url());
     referers.push(route.request().headers()['referer'] ?? '');
-    return route.fulfill({ status: 200, contentType: 'image/png', body: png });
+    return route.fulfill({ status: 200, contentType: 'image/png', body: PNG });
   });
   const w = await watch(page);
   await page.goto('/');
   await upload(page, 'demo.zip', Buffer.from(makeDemoExport()));
-  await page.getByRole('tab', { name: 'Courses' }).click();
-  await page.getByRole('combobox', { name: 'Centrer sur' }).selectOption('Paris');
-
-  const toggle = page.getByRole('button', { name: /Afficher les rues/ }).first();
-  await expect(toggle).toHaveAttribute('aria-pressed', 'false');
-  await toggle.click();
-  const dialog = page.getByRole('dialog', { name: 'Afficher les rues ?' });
-  await expect(dialog).toContainText('rien de votre export');
-  // Cancel → still nothing requested.
-  await dialog.getByRole('button', { name: 'Annuler' }).click();
-  await page.waitForTimeout(300);
+  // Nothing is requested before the rides map is shown.
   expect(tileHits).toEqual([]);
 
-  // Accept → tiles requested, from OpenStreetMap only, as images.
-  await toggle.click();
-  await page.getByRole('dialog').getByRole('button', { name: 'Afficher les rues' }).click();
-  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
+  await page.getByRole('tab', { name: 'Courses' }).click();
+  await page.getByRole('combobox', { name: 'Centrer sur' }).selectOption('Paris');
   await expect(page.locator('.map-tiles img').first()).toBeAttached();
   await expect(page.locator('.map-attrib')).toContainText('OpenStreetMap');
   await expect.poll(() => tileHits.length).toBeGreaterThan(0);
-  for (const u of tileHits) expect(u).toMatch(/^https:\/\/tile\.openstreetmap\.org\/\d+\/\d+\/\d+\.png$/);
+  for (const u of tileHits) expect(u).toMatch(OSM_TILE);
   // OSM's policy wants a Referer: only the site origin is sent, never a path.
   for (const r of referers) expect(r).toBe(`${baseURL}/`);
-  const others = w.requests.filter((u) => !u.startsWith(baseURL!) && !/tile\.openstreetmap\.org/.test(u));
-  expect(others).toEqual([]);
+  expect(external(w.requests, baseURL!)).toEqual([]);
   expect(await w.cspViolations()).toEqual([]);
 
-  // Off again → tiles removed; no new consent needed this visit.
-  await toggle.click();
-  await expect(page.locator('.map-tiles')).toHaveCount(0);
-  await toggle.click();
-  await expect(page.getByRole('dialog')).toHaveCount(0);
-  await expect(toggle).toHaveAttribute('aria-pressed', 'true');
 });
 
 test('map zoom and pan stick (no snap back) on both maps', async ({ page }) => {
@@ -288,7 +283,7 @@ test.describe(() => {
     await page.getByRole('tab', { name: 'Compte' }).click();
     await expect(kpi('Messages au support')).toContainText('87');
 
-    expect(w.requests.filter((u) => !u.startsWith(baseURL!))).toEqual([]);
+    expect(external(w.requests, baseURL!)).toEqual([]);
     expect(await w.cspViolations()).toEqual([]);
   });
 });

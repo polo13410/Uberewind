@@ -1,5 +1,5 @@
 /**
- * Optional street tiles (opt-in only, see StreetsConsent in ui/map/Maps.tsx).
+ * Street tiles for the rides map (see RidesMap in ui/map/Maps.tsx).
  * Pure tile math for a d3 Mercator projection combined with a d3-zoom transform.
  *
  * Provider: OpenStreetMap's standard tile layer (no API key). Usage policy:

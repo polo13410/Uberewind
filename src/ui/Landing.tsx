@@ -88,9 +88,9 @@ export function Landing({ onFiles, loading }: { onFiles: (f: File[]) => void; lo
               fermez l’onglet ou chargez un autre export.
             </li>
             <li>
-              Les cartes sont dessinées à partir de fichiers inclus dans le site, sans connexion. Si vous activez
-              l’option « Afficher les rues » (désactivée par défaut), le navigateur télécharge les images de la zone
-              affichée depuis OpenStreetMap. Rien de votre export ne leur est envoyé.
+              Sur la carte des courses, les rues sont des images téléchargées depuis OpenStreetMap pour la zone
+              affichée. OpenStreetMap ne reçoit que ces demandes d’images et votre adresse IP, rien de votre export.
+              La carte des commandes Uber Eats est dessinée à partir de fichiers inclus dans le site, sans connexion.
             </li>
           </ul>
         </details>

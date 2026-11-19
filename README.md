@@ -70,11 +70,11 @@ Le site a été conçu pour que les données de l'export ne quittent jamais le n
 
 - Il n'y a ni backend, ni base de données, ni analytics, ni CDN. Le site est statique et toutes les dépendances, polices comprises, sont embarquées.
 - La CSP (`default-src 'self'; connect-src 'none'; …`, voir [`csp.ts`](csp.ts)) bloque toute connexion sortante, donc même un bug ne pourrait pas envoyer de données. Elle est appliquée à deux endroits : en en-tête HTTP via [`netlify.toml`](netlify.toml), et dans une balise `<meta>` injectée au build.
-- Les cartes fonctionnent hors ligne par défaut. Le fond de carte (pays, et au zoom lacs, fleuves, zones urbaines et grands axes, d'après Natural Earth) et l'index des villes sont intégrés au site, dans un seul fichier identique pour tout le monde : même la région regardée n'est révélée à personne. Il n'y a pas de géocodage en ligne.
-- L'option « Afficher les rues » (carte des courses) est désactivée par défaut. Elle ne s'active qu'après un écran de consentement et n'est pas mémorisée d'une visite à l'autre. Les tuiles viennent d'[OpenStreetMap](https://www.openstreetmap.org/copyright), qui reçoit alors la zone affichée, l'adresse IP et le nom du site (`referrerpolicy="origin"`), mais aucune donnée de l'export. La CSP n'autorise ce domaine que pour des images (`img-src`), et `connect-src` reste `'none'`.
+- La carte des commandes Uber Eats fonctionne hors ligne. Le fond de carte (pays, et au zoom lacs, fleuves, zones urbaines et grands axes, d'après Natural Earth) et l'index des villes sont intégrés au site, dans un seul fichier identique pour tout le monde : même la région regardée n'est révélée à personne. Il n'y a pas de géocodage en ligne.
+- La carte des courses affiche les rues. Les tuiles viennent d'[OpenStreetMap](https://www.openstreetmap.org/copyright), qui reçoit alors la zone affichée, l'adresse IP et le nom du site (`referrerpolicy="origin"`), mais aucune donnée de l'export. La CSP n'autorise ce domaine que pour des images (`img-src`), et `connect-src` reste `'none'`.
 - Les colonnes sensibles sont ignorées dès le parsing. Chaque parseur a une liste blanche de colonnes, doublée d'une liste noire par sécurité. Ne sont jamais lus : e-mail, téléphone, IP, IMEI, identifiants d'appareil, numéros de carte/BIN, contenu des messages et tickets. `eats_app_analytics` et `communications_*` ne sont même pas décompressés.
 - Rien n'est persisté (ni `localStorage`, ni IndexedDB). « Charger un autre export » ou fermer l'onglet efface tout.
-- Les tests e2e échouent si une seule requête quitte l'origine, si une violation CSP survient, ou si une valeur sensible des fixtures apparaît dans la page.
+- Les tests e2e échouent si une requête quitte l'origine (hors images de tuiles OpenStreetMap), si une violation CSP survient, ou si une valeur sensible des fixtures apparaît dans la page.
 
 ## 🚀 Démarrage rapide
 
@@ -204,7 +204,7 @@ Exemple : `driver_lifetime_trips-*.csv`.
 ## ⚠️ Limites connues
 
 - Les formats ont été validés sur un seul export réel (rider et eater, 2026, en anglais). L'ancien format `trips_data.csv` est lu au mieux, et les exports chauffeur ne sont pas gérés.
-- **Rues** : hors ligne, le fond ne montre que les grands axes, lacs, fleuves et zones urbaines. Les rues détaillées demandent l'option OpenStreetMap (en ligne, avec consentement). Les trajets sont des segments droits départ → arrivée : l'export ne contient pas l'itinéraire suivi.
+- **Rues** : hors ligne, le fond ne montre que les grands axes, lacs, fleuves et zones urbaines. Les rues détaillées viennent d'OpenStreetMap (en ligne). Les trajets sont des segments droits départ → arrivée : l'export ne contient pas l'itinéraire suivi.
 - Il n'y a pas de conversion de devises. Le graphique mensuel empile les devises, et un sélecteur permet d'en isoler une.
 - Les heures sont affichées telles qu'Uber les fournit (`*_local`), sans conversion de fuseau.
 - Poids (gzip) :

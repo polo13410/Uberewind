@@ -15,7 +15,7 @@ import { useChartTheme } from '../useChartTheme';
  * Vector map: Natural Earth shapes bundled with the app, rendered as SVG with
  * d3-geo. By default no tiles and no network request at all. When zoomed on a
  * city, an offline orientation layer (lakes, rivers, urban areas, major roads)
- * is drawn. Street tiles are an explicit opt-in (`streets`).
+ * is drawn. With `streets`, OpenStreetMap tiles replace the offline shapes.
  */
 
 /** Zoom level (d3-zoom k) from which the offline orientation layer appears outside city view. */
@@ -35,7 +35,7 @@ interface GeoMapProps {
   describe: (count: number) => string;
   colorIndex?: number;
   ariaLabel: string;
-  /** Opt-in street tiles (the user has consented). */
+  /** Draw OpenStreetMap street tiles under the data. */
   streets?: boolean;
 }
 
@@ -194,7 +194,7 @@ export function GeoMap({
     };
   }, [wantBasemap, basemap, settled, projection, width, height]);
 
-  // ---- Opt-in street tiles, positioned in screen space for the live transform.
+  // ---- Street tiles, positioned in screen space for the live transform.
   const tiles = streets
     ? visibleTiles(
         {
