@@ -31,16 +31,6 @@ export function Landing({ onFiles, loading }: { onFiles: (f: File[]) => void; lo
           et de cartes.
         </p>
 
-        <DropZone onFiles={onFiles} loading={loading} />
-
-        <p className="trust">
-          Les données que vous déposez sont lues uniquement dans votre navigateur, sans passer par un serveur. Le{' '}
-          <a href={REPO_URL} target="_blank" rel="noopener noreferrer">
-            code est entièrement open source
-          </a>
-          .
-        </p>
-
         <ol className="hero-steps">
           <li>
             <span className="step-n" aria-hidden="true">
@@ -63,10 +53,20 @@ export function Landing({ onFiles, loading }: { onFiles: (f: File[]) => void; lo
             </span>
             <div>
               <h2>Déposez le fichier reçu</h2>
-              <p>Pas besoin de décompresser le .zip, il suffit de le déposer ci-dessus. La lecture prend quelques secondes.</p>
+              <p>Pas besoin de décompresser le .zip, il suffit de le déposer ci-dessous. La lecture prend quelques secondes.</p>
             </div>
           </li>
         </ol>
+
+        <DropZone onFiles={onFiles} loading={loading} />
+
+        <p className="trust">
+          Les données que vous déposez sont lues uniquement dans votre navigateur, sans passer par un serveur. Le{' '}
+          <a href={REPO_URL} target="_blank" rel="noopener noreferrer">
+            code est entièrement open source
+          </a>
+          .
+        </p>
 
         <details className="hero-privacy">
           <summary>Comment vos données sont traitées</summary>
