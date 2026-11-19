@@ -27,24 +27,9 @@ export function Landing({ onFiles, loading }: { onFiles: (f: File[]) => void; lo
       <main className="hero-main">
         <Wordmark as="h1" className="hero-title" />
         <p className="hero-tagline">
-          Rembobinez vos années Uber : courses, commandes Eats, villes et habitudes, en un coup d’œil.
+          Déposez l’export de vos données Uber pour voir vos courses et vos commandes Uber Eats sous forme de graphiques
+          et de cartes.
         </p>
-
-        <DropZone onFiles={onFiles} loading={loading} />
-
-        <ul className="trust">
-          <li>
-            <span aria-hidden="true">🔒</span> Vos données restent sur votre appareil
-          </li>
-          <li>
-            <span aria-hidden="true">🚫</span> Aucun serveur, aucun traceur
-          </li>
-          <li>
-            <a href={REPO_URL} target="_blank" rel="noopener noreferrer">
-              <GitHubIcon /> 100 % open source : vérifiez le code
-            </a>
-          </li>
-        </ul>
 
         <ol className="hero-steps">
           <li>
@@ -52,13 +37,13 @@ export function Landing({ onFiles, loading }: { onFiles: (f: File[]) => void; lo
               1
             </span>
             <div>
-              <h2>Demandez vos données</h2>
+              <h2>Demandez vos données à Uber</h2>
               <p>
-                Sur{' '}
+                Ça se passe sur{' '}
                 <a href={UBER_DATA_URL} target="_blank" rel="noopener noreferrer">
                   la page « Télécharger vos données » d’Uber
                 </a>{' '}
-                (Compte → Confidentialité). Le lien arrive par e-mail, en quelques jours maximum.
+                (Compte → Confidentialité). Uber envoie ensuite un lien par e-mail, en général sous quelques jours.
               </p>
             </div>
           </li>
@@ -67,28 +52,40 @@ export function Landing({ onFiles, loading }: { onFiles: (f: File[]) => void; lo
               2
             </span>
             <div>
-              <h2>Glissez-déposez, profitez</h2>
-              <p>Déposez le .zip ci-dessus, sans le décompresser : votre rétrospective s’affiche instantanément.</p>
+              <h2>Déposez le fichier reçu</h2>
+              <p>Pas besoin de décompresser le .zip, il suffit de le déposer ci-dessous. La lecture prend quelques secondes.</p>
             </div>
           </li>
         </ol>
 
+        <DropZone onFiles={onFiles} loading={loading} />
+
+        <p className="trust">
+          Les données que vous déposez sont lues uniquement dans votre navigateur, sans passer par un serveur. Le{' '}
+          <a href={REPO_URL} target="_blank" rel="noopener noreferrer">
+            code est entièrement open source
+          </a>
+          .
+        </p>
+
         <details className="hero-privacy">
-          <summary>Comment vos données sont protégées</summary>
+          <summary>Comment vos données sont traitées</summary>
           <ul>
-            <li>Le site est entièrement statique : pas de serveur, pas de base de données, pas d’analytics.</li>
             <li>
-              Sa politique de sécurité interdit toute connexion réseau depuis la page (<code>connect-src 'none'</code>) :
-              même par erreur, vos données ne peuvent pas partir.
+              Le site est une application React statique. Il n’a pas été prévu pour enregistrer vos données, il n’y a
+              donc pas de serveur derrière, ni de base de données, ni d’outil de mesure d’audience.
             </li>
             <li>
-              E-mail, téléphone, adresses IP, identifiants d’appareil, numéros de carte et messages au support sont ignorés
-              dès la lecture et ne sont jamais affichés.
+              La page est configurée pour bloquer toute connexion réseau sortante (<code>connect-src 'none'</code> dans
+              sa politique de sécurité). Même en cas de bug, elle ne pourrait pas envoyer vos données.
             </li>
-            <li>Rien n’est conservé : fermer l’onglet ou charger un autre export efface tout de la mémoire.</li>
             <li>
-              Les cartes fonctionnent hors ligne. Seule exception, sur demande explicite : le fond de rues OpenStreetMap,
-              désactivé par défaut. Il ne demande que des images de la zone affichée, jamais vos données.
+              Certaines colonnes de l’export ne sont pas lues du tout. C’est le cas de l’e-mail, du téléphone, des
+              adresses IP, des identifiants d’appareil, des numéros de carte et des messages envoyés au support.
+            </li>
+            <li>
+              Rien n’est sauvegardé. Les données restent en mémoire le temps de la visite et disparaissent quand vous
+              fermez l’onglet ou chargez un autre export.
             </li>
           </ul>
         </details>

@@ -1,25 +1,39 @@
 import { geoDistance, geoMercator, geoPath } from 'd3-geo';
 import { select } from 'd3-selection';
-import { zoom, zoomIdentity, type D3ZoomEvent, type ZoomBehavior, type ZoomTransform } from 'd3-zoom';
+import { interpolateZoom } from 'd3-interpolate';
+import { zoom, zoomIdentity, zoomTransform, type D3ZoomEvent, type ZoomBehavior, type ZoomTransform } from 'd3-zoom';
 import type { Feature, FeatureCollection, MultiLineString, MultiPoint } from 'geojson';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { feature, mesh } from 'topojson-client';
 import type { GeometryCollection, Topology } from 'topojson-specification';
 import world from 'world-atlas/countries-50m.json';
 import { inBox, loadBasemap, toPath, type Basemap, type Box } from '../../geo/basemap';
 import type { CityPoint, Segment } from '../../geo/mapData';
-import { MERCATOR_MAX_LAT, TILE_ATTRIBUTION, visibleTiles } from '../../geo/tiles';
+import { MERCATOR_MAX_LAT, TILE_ATTRIBUTION, TILE_MAX_ZOOM, tileZoom, visibleTiles, type TileView } from '../../geo/tiles';
 import { useChartTheme } from '../useChartTheme';
 
 /*
  * Vector map: Natural Earth shapes bundled with the app, rendered as SVG with
  * d3-geo. By default no tiles and no network request at all. When zoomed on a
  * city, an offline orientation layer (lakes, rivers, urban areas, major roads)
- * is drawn. Street tiles are an explicit opt-in (`streets`).
+ * is drawn. With `streets`, OpenStreetMap tiles replace the offline shapes.
  */
 
 /** Zoom level (d3-zoom k) from which the offline orientation layer appears outside city view. */
 const BASEMAP_MIN_K = 3;
+const MAX_K = 60;
+
+/**
+ * Ctrl/⌘ + wheel. d3's default multiplies by 10 when Ctrl is held (meant for
+ * trackpad pinches, which send tiny deltas), so one mouse-wheel notch zoomed ×4.
+ * Same speed for pinches, but a notch is capped to about ×1.3.
+ */
+function wheelDelta(ev: WheelEvent): number {
+  const d = -ev.deltaY * (ev.deltaMode === 1 ? 0.05 : ev.deltaMode ? 1 : 0.002) * 10;
+  return Math.max(-0.4, Math.min(0.4, d));
+}
+
+const easeInOut = (t: number) => (t < 0.5 ? 4 * t * t * t : 1 - (-2 * t + 2) ** 3 / 2);
 
 const topo = world as unknown as Topology<{ countries: GeometryCollection; land: GeometryCollection }>;
 const LAND = feature(topo, topo.objects.land) as FeatureCollection;
@@ -35,8 +49,10 @@ interface GeoMapProps {
   describe: (count: number) => string;
   colorIndex?: number;
   ariaLabel: string;
-  /** Opt-in street tiles (the user has consented). */
+  /** Draw OpenStreetMap street tiles under the data. */
   streets?: boolean;
+  /** Tooltip content for a hovered trip line. */
+  segmentTooltip?: (s: Segment) => ReactNode;
 }
 
 /** Bounding "MultiPoint" with a minimum span (degrees) so a single city is not zoomed to the street. */
@@ -75,6 +91,7 @@ export function GeoMap({
   colorIndex = 0,
   ariaLabel,
   streets = false,
+  segmentTooltip,
 }: GeoMapProps) {
   const th = useChartTheme();
   const wrapRef = useRef<HTMLDivElement>(null);
@@ -86,6 +103,13 @@ export function GeoMap({
   const [settled, setSettled] = useState<ZoomTransform>(zoomIdentity);
   const [basemap, setBasemap] = useState<Basemap | null>(null);
   const [hover, setHover] = useState<{ city: CityPoint; x: number; y: number } | null>(null);
+  /** Hovered trip line (index in `focusSegments`). */
+  const [hoverSeg, setHoverSeg] = useState<number | null>(null);
+  /** Street tiles whose image has loaded (by URL), and the last tile level fully shown. */
+  const [loadedTiles, setLoadedTiles] = useState<Set<string>>(() => new Set());
+  const [backZ, setBackZ] = useState<number | null>(null);
+  /** Running zoom animation (buttons, reset), cancelled by any user gesture. */
+  const animRef = useRef<{ frame: number; target: ZoomTransform } | null>(null);
   const height = Math.round(Math.max(260, Math.min(440, width * 0.58)));
 
   // Responsive width.
@@ -130,17 +154,32 @@ export function GeoMap({
     const svg = svgRef.current;
     if (!svg) return;
     const z = zoom<SVGSVGElement, unknown>()
-      .scaleExtent([1, 60])
+      .scaleExtent([1, MAX_K])
+      .wheelDelta(wheelDelta)
       .filter((ev: Event) => {
         if (ev.type === 'wheel') return (ev as WheelEvent).ctrlKey || (ev as WheelEvent).metaKey;
         if (ev.type.startsWith('touch')) return (ev as TouchEvent).touches.length > 1;
         return !(ev as MouseEvent).button;
       })
-      .on('zoom', (ev: D3ZoomEvent<SVGSVGElement, unknown>) => setTransform(ev.transform))
-      .on('end', (ev: D3ZoomEvent<SVGSVGElement, unknown>) => setSettled(ev.transform));
+      .on('start', (ev: D3ZoomEvent<SVGSVGElement, unknown>) => {
+        if (ev.sourceEvent && animRef.current) {
+          cancelAnimationFrame(animRef.current.frame);
+          animRef.current = null;
+        }
+      })
+      .on('zoom', (ev: D3ZoomEvent<SVGSVGElement, unknown>) => {
+        setTransform(ev.transform);
+        // Hide the trip tooltip while the user pans or zooms.
+        if (ev.sourceEvent) setHoverSeg(null);
+      })
+      // During an animation every frame ends a "gesture": settle only on the last one.
+      .on('end', (ev: D3ZoomEvent<SVGSVGElement, unknown>) => {
+        if (!animRef.current) setSettled(ev.transform);
+      });
     zoomRef.current = z;
     select(svg).call(z);
     return () => {
+      if (animRef.current) cancelAnimationFrame(animRef.current.frame);
       select(svg).on('.zoom', null);
     };
   }, []);
@@ -149,15 +188,50 @@ export function GeoMap({
   // never because of a mere re-render — zoom/pan events re-render on every frame.
   const framingKey = `${focus?.name ?? ''}|${cities.length}|${focusSegments.length}|${width}x${height}`;
   useEffect(() => {
+    if (animRef.current) {
+      cancelAnimationFrame(animRef.current.frame);
+      animRef.current = null;
+    }
     if (svgRef.current && zoomRef.current) select(svgRef.current).call(zoomRef.current.transform, zoomIdentity);
     setSettled(zoomIdentity);
     setHover(null);
+    setHoverSeg(null);
   }, [framingKey]);
 
-  const zoomBy = (k: number) => svgRef.current && zoomRef.current && select(svgRef.current).call(zoomRef.current.scaleBy, k);
+  /** Smooth zoom to `to` (van Wijk & Nuij path, as d3 transitions do). */
+  const animateTo = (to: ZoomTransform) => {
+    const svg = svgRef.current;
+    const z = zoomRef.current;
+    if (!svg || !z) return;
+    if (animRef.current) cancelAnimationFrame(animRef.current.frame);
+    const from = zoomTransform(svg);
+    const [cx, cy] = [width / 2, height / 2];
+    const view = (t: ZoomTransform): [number, number, number] => [(cx - t.x) / t.k, (cy - t.y) / t.k, width / t.k];
+    const path = interpolateZoom(view(from), view(to));
+    const ms = Math.max(250, Math.min(700, path.duration * 0.6));
+    const t0 = performance.now();
+    const step = (now: number) => {
+      const p = Math.min(1, (now - t0) / ms);
+      const [x, y, w] = path(easeInOut(p));
+      const k = width / w;
+      animRef.current = p < 1 ? { frame: requestAnimationFrame(step), target: to } : null;
+      select(svg).call(z.transform, p < 1 ? zoomIdentity.translate(cx - x * k, cy - y * k).scale(k) : to);
+    };
+    animRef.current = { frame: requestAnimationFrame(step), target: to };
+  };
+
+  const zoomBy = (f: number) => {
+    const svg = svgRef.current;
+    if (!svg) return;
+    // Chained clicks start from where the running animation is heading.
+    const from = animRef.current?.target ?? zoomTransform(svg);
+    const k = Math.max(1, Math.min(MAX_K, from.k * f));
+    const [cx, cy] = [width / 2, height / 2];
+    animateTo(zoomIdentity.translate(cx - ((cx - from.x) / from.k) * k, cy - ((cy - from.y) / from.k) * k).scale(k));
+  };
   const reset = () => {
     if (focus) onSelectCity?.(null);
-    else if (svgRef.current && zoomRef.current) select(svgRef.current).call(zoomRef.current.transform, zoomIdentity);
+    else animateTo(zoomIdentity);
   };
 
   const k = transform.k;
@@ -194,43 +268,74 @@ export function GeoMap({
     };
   }, [wantBasemap, basemap, settled, projection, width, height]);
 
-  // ---- Opt-in street tiles, positioned in screen space for the live transform.
-  const tiles = streets
-    ? visibleTiles(
-        {
-          scale: projection.scale(),
-          origin: [projection([-180, 0])?.[0] ?? 0, projection([0, MERCATOR_MAX_LAT])?.[1] ?? 0],
-          k: transform.k,
-          tx: transform.x,
-          ty: transform.y,
-          width,
-          height,
-        },
-      )
-    : [];
+  // ---- Street tiles, positioned in screen space for the live transform.
+  const tileView: TileView = {
+    scale: projection.scale(),
+    origin: [projection([-180, 0])?.[0] ?? 0, projection([0, MERCATOR_MAX_LAT])?.[1] ?? 0],
+    k: transform.k,
+    tx: transform.x,
+    ty: transform.y,
+    width,
+    height,
+  };
+  const tileZ = streets ? tileZoom(tileView) : 0;
+  const tiles = streets ? visibleTiles(tileView, TILE_MAX_ZOOM, tileZ) : [];
+  const tilesReady = tiles.every((t) => loadedTiles.has(t.url));
+  // While the tiles of a new zoom level load, the last complete level stays drawn
+  // underneath (only tiles already loaded, so nothing extra is requested): no blank flash.
+  const backTiles =
+    streets && backZ != null && backZ !== tileZ && Math.abs(backZ - tileZ) <= 4
+      ? visibleTiles(tileView, TILE_MAX_ZOOM, backZ).filter((t) => loadedTiles.has(t.url))
+      : [];
+  useEffect(() => {
+    if (streets && tilesReady && tiles.length > 0 && backZ !== tileZ) setBackZ(tileZ);
+  }, [streets, tilesReady, tiles.length, backZ, tileZ]);
+  const onTileLoad = (url: string) =>
+    setLoadedTiles((s) => {
+      if (s.has(url)) return s;
+      // Bounded memory: past a few hundred tiles, keep only what is on screen.
+      const next = s.size > 600 ? new Set(tiles.map((t) => t.url).filter((u) => s.has(u))) : new Set(s);
+      next.add(url);
+      return next;
+    });
 
   const max = Math.max(1, ...cities.map((c) => c.count));
   const radius = (c: CityPoint) => 4 + 20 * Math.sqrt(c.count / max);
   const color = th.series[colorIndex % th.series.length];
   const labelled = new Set(cities.slice(0, 8).map((c) => c.name));
-  if (focus) labelled.add(focus.name);
 
-  const lines = focusSegments.map((s, i) => {
-    const a = projection([s.from[1], s.from[0]]);
-    const b = projection([s.to[1], s.to[0]]);
-    return a && b ? <line key={i} x1={a[0]} y1={a[1]} x2={b[0]} y2={b[1]} /> : null;
-  });
-  // City view: hollow = pick-up, filled = drop-off.
-  const ends = focus
-    ? focusSegments.flatMap((s, i) => {
+  const projected = useMemo(
+    () =>
+      focusSegments.map((s) => {
         const a = projection([s.from[1], s.from[0]]);
         const b = projection([s.to[1], s.to[0]]);
-        return [
-          a ? <circle key={`a${i}`} className="map-start" cx={a[0]} cy={a[1]} r={3 / k} /> : null,
-          b ? <circle key={`b${i}`} cx={b[0]} cy={b[1]} r={2.6 / k} /> : null,
-        ];
-      })
+        return a && b ? { a, b } : null;
+      }),
+    [focusSegments, projection],
+  );
+  const lines = projected.map((p, i) => (p ? <line key={i} x1={p.a[0]} y1={p.a[1]} x2={p.b[0]} y2={p.b[1]} /> : null));
+  // City view: hollow = pick-up, filled = drop-off.
+  const ends = focus
+    ? projected.flatMap((p, i) =>
+        p
+          ? [
+              <circle key={`a${i}`} className="map-start" cx={p.a[0]} cy={p.a[1]} r={3.2 / k} />,
+              <circle key={`b${i}`} className="map-end" cx={p.b[0]} cy={p.b[1]} r={2.8 / k} />,
+            ]
+          : [],
+      )
     : null;
+  const hovered = hoverSeg != null ? projected[hoverSeg] : null;
+  // Trip tooltip: above the trip (below it near the top edge), so it never covers its two ends.
+  const segTip = (() => {
+    if (!hovered) return null;
+    const xs = [transform.applyX(hovered.a[0]), transform.applyX(hovered.b[0])];
+    const ys = [transform.applyY(hovered.a[1]), transform.applyY(hovered.b[1])];
+    const half = Math.min(150, width / 2);
+    const x = Math.max(half, Math.min(width - half, (xs[0] + xs[1]) / 2));
+    const top = Math.min(...ys) - 8;
+    return top > 110 ? { x, y: top, below: false } : { x, y: Math.max(...ys) + 8, below: true };
+  })();
 
   // Scale bar: nice round distance for ~100 px at the current zoom.
   const scale = (() => {
@@ -245,19 +350,36 @@ export function GeoMap({
   })();
 
   return (
-    <div className={`map${streets ? ' has-streets' : ''}${th.dark ? ' is-dark' : ''}`} ref={wrapRef}>
+    <div
+      className={`map${streets ? ' has-streets' : ''}${th.dark ? ' is-dark' : ''}`}
+      ref={wrapRef}
+      style={{ '--series': color } as CSSProperties}
+    >
       {streets && (
         // HTML <img> (not SVG <image>) so each tile can send the site origin as Referer,
         // which OSM's tile policy requires, while the page itself stays `no-referrer`.
         <div className="map-tiles" aria-hidden="true">
+          {backTiles.map((t) => (
+            <img
+              key={`b${t.key}`}
+              className="is-back"
+              src={t.url}
+              alt=""
+              referrerPolicy="origin"
+              draggable={false}
+              style={{ left: t.x, top: t.y, width: t.size + 0.5, height: t.size + 0.5 }}
+            />
+          ))}
           {tiles.map((t) => (
             <img
               key={t.key}
+              className={loadedTiles.has(t.url) ? 'is-loaded' : undefined}
               src={t.url}
               alt=""
               referrerPolicy="origin"
               decoding="async"
               draggable={false}
+              onLoad={() => onTileLoad(t.url)}
               style={{ left: t.x, top: t.y, width: t.size + 0.5, height: t.size + 0.5 }}
             />
           ))}
@@ -271,7 +393,10 @@ export function GeoMap({
         viewBox={`0 0 ${width} ${height}`}
         role="img"
         aria-label={ariaLabel}
-        onMouseLeave={() => setHover(null)}
+        onMouseLeave={() => {
+          setHover(null);
+          setHoverSeg(null);
+        }}
       >
         {!streets && <rect className="map-water" width={width} height={height} />}
         <g transform={transform.toString()}>
@@ -286,25 +411,51 @@ export function GeoMap({
           )}
           {!streets && <path className="map-border" d={paths.borders} />}
           {lines.length > 0 && (
-            <g className="map-trips" stroke={color}>
+            <g className={`map-trips${hovered ? ' has-hover' : ''}`} stroke={color}>
               {lines}
             </g>
           )}
           {ends && (
-            <g className="map-ends" fill={color} color={color}>
+            <g className={`map-ends${hovered ? ' has-hover' : ''}`} fill={color}>
               {ends}
+            </g>
+          )}
+          {hovered && (
+            <g className="map-trip-hi" stroke={color} fill={color}>
+              <line x1={hovered.a[0]} y1={hovered.a[1]} x2={hovered.b[0]} y2={hovered.b[1]} />
+              <circle className="map-start" cx={hovered.a[0]} cy={hovered.a[1]} r={4.5 / k} />
+              <circle className="map-end" cx={hovered.b[0]} cy={hovered.b[1]} r={4 / k} />
+            </g>
+          )}
+          {segmentTooltip && lines.length > 0 && (
+            // Wide transparent strokes: the visible lines are too thin to hover.
+            <g className="map-hits">
+              {projected.map((p, i) =>
+                p ? (
+                  <line
+                    key={i}
+                    x1={p.a[0]}
+                    y1={p.a[1]}
+                    x2={p.b[0]}
+                    y2={p.b[1]}
+                    onMouseEnter={() => setHoverSeg(i)}
+                    onMouseLeave={() => setHoverSeg((h) => (h === i ? null : h))}
+                  />
+                ) : null,
+              )}
             </g>
           )}
           <g>
             {cities.map((c) => {
+              // City view: the focused city's bubble would hide its own trips.
+              if (focus?.name === c.name) return null;
               const p = projection([c.lng, c.lat]);
               if (!p) return null;
               const r = (focus ? Math.min(radius(c), 8) : radius(c)) / k;
-              const active = focus?.name === c.name;
               return (
                 <g key={c.name}>
                   <circle
-                    className={`map-city${active ? ' is-active' : ''}${focus && !active ? ' is-dim' : ''}`}
+                    className={`map-city${focus ? ' is-dim' : ''}`}
                     cx={p[0]}
                     cy={p[1]}
                     r={r}
@@ -316,11 +467,11 @@ export function GeoMap({
                     onMouseEnter={() => setHover({ city: c, x: transform.applyX(p[0]), y: transform.applyY(p[1]) - r * k })}
                     onFocus={() => setHover({ city: c, x: transform.applyX(p[0]), y: transform.applyY(p[1]) - r * k })}
                     onBlur={() => setHover(null)}
-                    onClick={() => onSelectCity?.(active ? null : c.name)}
+                    onClick={() => onSelectCity?.(c.name)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
-                        onSelectCity?.(active ? null : c.name);
+                        onSelectCity?.(c.name);
                       }
                     }}
                   />
@@ -343,6 +494,15 @@ export function GeoMap({
           <div className="tt-title">{hover.city.name}</div>
         </div>
       )}
+      {segTip && hoverSeg != null && segmentTooltip && (
+        <div
+          className={`tt map-tooltip is-trip${segTip.below ? ' is-below' : ''}`}
+          style={{ left: segTip.x, top: segTip.y }}
+          role="status"
+        >
+          {segmentTooltip(focusSegments[hoverSeg])}
+        </div>
+      )}
       <div className="map-overlay" aria-hidden="true">
         {scale && (
           <span className="map-scale">
@@ -352,7 +512,9 @@ export function GeoMap({
         )}
         {focus && focusSegments.length > 0 && (
           <span className="map-key">
-            <i className="k-start" style={{ borderColor: color }} /> départ <i className="k-end" style={{ background: color }} /> arrivée
+            <i className="k-start" /> Départ
+            <i className="k-line" />
+            <i className="k-end" /> Arrivée
           </span>
         )}
       </div>

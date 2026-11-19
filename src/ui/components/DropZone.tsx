@@ -98,14 +98,14 @@ export function DropZone({ onFiles, loading }: { onFiles: (files: File[]) => voi
       {loading ? (
         <div className="dz-body" role="status" aria-live="polite">
           <span className="spinner" aria-hidden="true" />
-          <p className="dz-title">Analyse en cours…</p>
+          <p className="dz-title">Lecture en cours…</p>
           <p className="dz-sub">{loading}</p>
         </div>
       ) : (
         <div className="dz-body">
           <UploadIcon />
-          <p className="dz-title">{over ? 'Relâchez pour rembobiner' : 'Glissez votre export Uber ici'}</p>
-          <p className="dz-sub">le fichier .zip tel quel, plusieurs .csv ou le dossier décompressé</p>
+          <p className="dz-title">{over ? 'Vous pouvez relâcher' : 'Glissez votre export Uber ici'}</p>
+          <p className="dz-sub">le .zip tel quel, les fichiers .csv ou le dossier décompressé</p>
           <span className="dz-cta">Choisir le fichier</span>
         </div>
       )}

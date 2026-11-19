@@ -1,5 +1,5 @@
 /**
- * Optional street tiles (opt-in only, see StreetsConsent in ui/map/Maps.tsx).
+ * Street tiles for the rides map (see RidesMap in ui/map/Maps.tsx).
  * Pure tile math for a d3 Mercator projection combined with a d3-zoom transform.
  *
  * Provider: OpenStreetMap's standard tile layer (no API key). Usage policy:
@@ -46,13 +46,19 @@ export function tileUrl(z: number, x: number, y: number): string {
   return `${TILE_HOST}/${z}/${x}/${y}.png`;
 }
 
+/** Tile zoom level that best matches the view (tiles drawn close to 256 px). */
+export function tileZoom(v: TileView, maxZoom = TILE_MAX_ZOOM): number {
+  const worldPx = 2 * Math.PI * v.scale * v.k;
+  return Math.max(0, Math.min(maxZoom, Math.round(Math.log2(worldPx / 256))));
+}
+
 /**
  * Tiles covering the viewport. In d3's Mercator, x = R·λ + tx, so the world is
  * 2πR wide; at zoom k it is 2πR·k screen pixels, i.e. 2^z tiles of `size` px.
+ * `z` forces another tile level (e.g. the previous one, kept as a backdrop).
  */
-export function visibleTiles(v: TileView, maxZoom = TILE_MAX_ZOOM): Tile[] {
+export function visibleTiles(v: TileView, maxZoom = TILE_MAX_ZOOM, z = tileZoom(v, maxZoom)): Tile[] {
   const worldPx = 2 * Math.PI * v.scale * v.k;
-  const z = Math.max(0, Math.min(maxZoom, Math.round(Math.log2(worldPx / 256))));
   const n = 2 ** z;
   const size = worldPx / n;
   // Screen position of the world's top-left corner (λ = -180°, φ ≈ 85.05°) at the current zoom.

@@ -1,10 +1,10 @@
-import { useId, useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import type { EatsOrder, Trip } from '../../core/types';
 import rows from '../../geo/cities.json';
 import { buildGazetteer, type GazetteerRow } from '../../geo/gazetteer';
 import { eatsCities, rideCities, tripSegments, type MapLayer, type Segment } from '../../geo/mapData';
 import { ChartCard, Empty } from '../components/Charts';
-import { plural } from '../format';
+import { fmtDateTime, fmtInt, fmtMoney, fmtNum, plural } from '../format';
 import { GeoMap } from './GeoMap';
 
 // Built once, the first time a map is shown (this module is lazy-loaded).
@@ -18,52 +18,44 @@ interface MapCardProps {
   describe: (n: number) => string;
   colorIndex?: number;
   unit: string;
-  /** Offer the opt-in street tiles. */
-  allowStreets?: boolean;
+  /** Draw OpenStreetMap street tiles under the data. */
+  streets?: boolean;
+  segmentTooltip?: (s: Segment) => ReactNode;
 }
 
-/**
- * Explicit, per-visit consent before any street tile is requested. Nothing is
- * remembered: the next visit starts again with streets off.
- */
-function StreetsConsent({ onAccept, onCancel }: { onAccept: () => void; onCancel: () => void }) {
-  const id = useId();
+/** Hover tooltip of one trip line. */
+function tripTooltip({ trip: t }: Segment) {
+  const meta = [
+    t.km != null ? `${fmtNum(t.km, 1)} km` : null,
+    t.durationSec != null ? `${fmtInt(t.durationSec / 60)} min` : null,
+    t.fare != null && t.currency ? fmtMoney(t.fare, t.currency) : null,
+  ].filter(Boolean);
   return (
-    <div className="consent" role="dialog" aria-modal="false" aria-labelledby={`${id}-t`} aria-describedby={`${id}-d`}>
-      <p id={`${id}-t`} className="consent-title">
-        Afficher les rues ?
-      </p>
-      <p id={`${id}-d`}>
-        Les rues viennent des serveurs d’<b>OpenStreetMap</b>. Pour les afficher, votre navigateur télécharge des
-        images de la <b>zone affichée</b> : OpenStreetMap reçoit donc la zone regardée, votre adresse IP et le nom de ce
-        site,{' '}
-        <b>mais aucune de vos données Uber</b> (ni trajets, ni dates, ni montants). Rien n’est mémorisé : l’option est
-        désactivée à chaque nouvelle visite.
-      </p>
-      <div className="consent-actions">
-        <button type="button" className="btn btn-primary" onClick={onAccept} autoFocus>
-          Afficher les rues
-        </button>
-        <button type="button" className="btn" onClick={onCancel}>
-          Annuler
-        </button>
+    <>
+      <div className="tt-title">
+        {fmtDateTime(t.t)}
+        {t.product ? ` · ${t.product}` : ''}
       </div>
-    </div>
+      <div className="tt-row">
+        <i className="k-start" />
+        <span>
+          <b>Départ</b> {t.from ?? '—'}
+        </span>
+      </div>
+      <div className="tt-row">
+        <i className="k-end" />
+        <span>
+          <b>Arrivée</b> {t.to ?? '—'}
+        </span>
+      </div>
+      {meta.length > 0 && <div className="tt-meta">{meta.join(' · ')}</div>}
+    </>
   );
 }
 
-function MapCard({ title, sub, layer, segments, describe, colorIndex, unit, allowStreets }: MapCardProps) {
+function MapCard({ title, sub, layer, segments, describe, colorIndex, unit, streets = false, segmentTooltip }: MapCardProps) {
   const [focusName, setFocusName] = useState<string | null>(null);
-  const [consented, setConsented] = useState(false);
-  const [asking, setAsking] = useState(false);
-  const [streets, setStreets] = useState(false);
   const focus = layer.cities.find((c) => c.name === focusName) ?? null;
-
-  const toggleStreets = () => {
-    if (streets) setStreets(false);
-    else if (consented) setStreets(true);
-    else setAsking(true);
-  };
 
   return (
     <ChartCard
@@ -72,11 +64,6 @@ function MapCard({ title, sub, layer, segments, describe, colorIndex, unit, allo
       sub={sub}
       actions={
         <div className="map-actions">
-          {allowStreets && layer.cities.length > 0 && (
-            <button type="button" className={`btn btn-toggle${streets ? ' is-on' : ''}`} aria-pressed={streets} onClick={toggleStreets}>
-              <span aria-hidden="true">🗺️</span> Afficher les rues
-            </button>
-          )}
           {layer.cities.length > 1 && (
           <label className="field">
             Centrer sur
@@ -94,19 +81,10 @@ function MapCard({ title, sub, layer, segments, describe, colorIndex, unit, allo
       }
       data={{ headers: ['Ville', unit], rows: layer.cities.map((c) => [c.name, c.count]) }}
     >
-      {asking && (
-        <StreetsConsent
-          onAccept={() => {
-            setConsented(true);
-            setStreets(true);
-            setAsking(false);
-          }}
-          onCancel={() => setAsking(false)}
-        />
-      )}
       {layer.cities.length ? (
         <GeoMap
           streets={streets}
+          segmentTooltip={segmentTooltip}
           cities={layer.cities}
           segments={segments}
           focus={focus}
@@ -125,8 +103,8 @@ function MapCard({ title, sub, layer, segments, describe, colorIndex, unit, allo
         {layer.unresolved.length > 0 && <>Non localisées : {layer.unresolved.join(', ')}. </>}
         Ctrl + molette ou pincement pour zoomer, glisser pour déplacer.{' '}
         {streets
-          ? 'Rues : © les contributeurs OpenStreetMap (chargées à votre demande).'
-          : 'Fond de carte Natural Earth intégré au site (lacs, fleuves, villes et grands axes au zoom) : aucune requête réseau.'}
+          ? 'Rues © les contributeurs OpenStreetMap.'
+          : 'Fond de carte Natural Earth inclus dans le site, sans connexion. Les lacs, fleuves et grands axes apparaissent en zoomant.'}
       </p>
     </ChartCard>
   );
@@ -140,12 +118,13 @@ export function RidesMap({ trips }: { trips: readonly Trip[] }) {
       title="Carte des courses"
       sub={
         segments.length
-          ? 'Une bulle par ville (taille = nombre de courses). Choisissez une ville pour voir vos trajets.'
+          ? 'Une bulle par ville (taille = nombre de courses). Choisissez une ville pour voir vos trajets, survolez-en un pour le détail.'
           : 'Une bulle par ville (taille = nombre de courses).'
       }
       layer={layer}
       segments={segments}
-      allowStreets
+      streets
+      segmentTooltip={tripTooltip}
       describe={(n) => plural(n, 'course', 'courses')}
       unit="Courses"
     />

@@ -4,13 +4,11 @@
 
 # UBE<i>REWIND</i>
 
-**Rembobinez vos années Uber.** Déposez l'export officiel de vos données Uber et obtenez un tableau de bord complet (courses, Uber Eats, villes, habitudes, compte), **calculé entièrement dans votre navigateur**.
+Uberewind affiche l'export de vos données Uber (courses, commandes Uber Eats, compte) sous forme de graphiques, de cartes et de tableaux. Tout est calculé dans le navigateur, rien n'est envoyé à un serveur.
 
 [![CI](https://github.com/polo13410/Uberewind/actions/workflows/ci.yml/badge.svg)](https://github.com/polo13410/Uberewind/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/license-MIT-black.svg)](LICENSE)
-[![Privacy: 100 % local](https://img.shields.io/badge/privacy-100%25%20local-2ea44f.svg)](#-confidentialité)
 [![CSP: connect-src 'none'](https://img.shields.io/badge/CSP-connect--src%20'none'-2ea44f.svg)](csp.ts)
-[![No tracking](https://img.shields.io/badge/tracking-none-2ea44f.svg)](#-confidentialité)
 
 [![Node 26](https://img.shields.io/badge/Node-26-5FA04E?logo=nodedotjs&logoColor=white)](.nvmrc)
 [![React 19](https://img.shields.io/badge/React-19-61DAFB?logo=react&logoColor=black)](https://react.dev)
@@ -68,15 +66,15 @@ Sont acceptés en entrée le **.zip** complet, plusieurs **.csv**, ou le **dossi
 
 ## 🔒 Confidentialité
 
-C'est la contrainte de conception numéro un.
+Le site a été conçu pour que les données de l'export ne quittent jamais le navigateur.
 
-- **Aucun backend, aucune base de données, aucun analytics, aucun CDN.** Le site est 100 % statique et toutes les dépendances, polices comprises, sont embarquées.
-- **CSP stricte** : `default-src 'self'; connect-src 'none'; …` (voir [`csp.ts`](csp.ts)). Même un bug ne pourrait pas envoyer de données. Elle est appliquée à deux endroits : en en-tête HTTP via [`netlify.toml`](netlify.toml), et dans une balise `<meta>` injectée au build.
-- **Les cartes sont hors ligne par défaut.** Le fond de carte (pays, et au zoom lacs, fleuves, zones urbaines et grands axes, d'après Natural Earth) et l'index des villes sont intégrés au site, dans un seul fichier identique pour tout le monde : même la région regardée n'est révélée à personne. Il n'y a pas de géocodage en ligne.
-- **Option « Afficher les rues »** (carte des courses) : elle est **désactivée par défaut**, ne s'active qu'après un écran de consentement, et n'est pas mémorisée d'une visite à l'autre. Les tuiles viennent d'[OpenStreetMap](https://www.openstreetmap.org/copyright), qui reçoit alors la zone affichée, l'adresse IP et le nom du site (`referrerpolicy="origin"`), **jamais les données Uber**. La CSP n'autorise ce domaine que pour des **images** (`img-src`), et `connect-src` reste `'none'`.
-- **Les colonnes sensibles sont ignorées dès le parsing.** Chaque parseur a une **liste blanche** de colonnes, doublée d'une **liste noire** de garde-fou. Ne sont jamais lus : e-mail, téléphone, IP, IMEI, identifiants d'appareil, numéros de carte/BIN, contenu des messages et tickets. `eats_app_analytics` et `communications_*` ne sont même pas décompressés.
-- **Rien n'est persisté** : ni `localStorage`, ni IndexedDB. « Charger un autre export » ou fermer l'onglet efface tout.
-- **Vérifié automatiquement** : les tests e2e échouent si une seule requête quitte l'origine, si une violation CSP survient, ou si une valeur sensible des fixtures apparaît dans la page.
+- Il n'y a ni backend, ni base de données, ni analytics, ni CDN. Le site est statique et toutes les dépendances, polices comprises, sont embarquées.
+- La CSP (`default-src 'self'; connect-src 'none'; …`, voir [`csp.ts`](csp.ts)) bloque toute connexion sortante, donc même un bug ne pourrait pas envoyer de données. Elle est appliquée à deux endroits : en en-tête HTTP via [`netlify.toml`](netlify.toml), et dans une balise `<meta>` injectée au build.
+- La carte des commandes Uber Eats fonctionne hors ligne. Le fond de carte (pays, et au zoom lacs, fleuves, zones urbaines et grands axes, d'après Natural Earth) et l'index des villes sont intégrés au site, dans un seul fichier identique pour tout le monde : même la région regardée n'est révélée à personne. Il n'y a pas de géocodage en ligne.
+- La carte des courses affiche les rues. Les tuiles viennent d'[OpenStreetMap](https://www.openstreetmap.org/copyright), qui reçoit alors la zone affichée, l'adresse IP et le nom du site (`referrerpolicy="origin"`), mais aucune donnée de l'export. La CSP n'autorise ce domaine que pour des images (`img-src`), et `connect-src` reste `'none'`.
+- Les colonnes sensibles sont ignorées dès le parsing. Chaque parseur a une liste blanche de colonnes, doublée d'une liste noire par sécurité. Ne sont jamais lus : e-mail, téléphone, IP, IMEI, identifiants d'appareil, numéros de carte/BIN, contenu des messages et tickets. `eats_app_analytics` et `communications_*` ne sont même pas décompressés.
+- Rien n'est persisté (ni `localStorage`, ni IndexedDB). « Charger un autre export » ou fermer l'onglet efface tout.
+- Les tests e2e échouent si une requête quitte l'origine (hors images de tuiles OpenStreetMap), si une violation CSP survient, ou si une valeur sensible des fixtures apparaît dans la page.
 
 ## 🚀 Démarrage rapide
 
@@ -206,7 +204,7 @@ Exemple : `driver_lifetime_trips-*.csv`.
 ## ⚠️ Limites connues
 
 - Les formats ont été validés sur un seul export réel (rider et eater, 2026, en anglais). L'ancien format `trips_data.csv` est lu au mieux, et les exports chauffeur ne sont pas gérés.
-- **Rues** : hors ligne, le fond ne montre que les grands axes, lacs, fleuves et zones urbaines. Les rues détaillées demandent l'option OpenStreetMap (en ligne, avec consentement). Les trajets sont des segments droits départ → arrivée : l'export ne contient pas l'itinéraire suivi.
+- **Rues** : hors ligne, le fond ne montre que les grands axes, lacs, fleuves et zones urbaines. Les rues détaillées viennent d'OpenStreetMap (en ligne). Les trajets sont des segments droits départ → arrivée : l'export ne contient pas l'itinéraire suivi.
 - Il n'y a pas de conversion de devises. Le graphique mensuel empile les devises, et un sélecteur permet d'en isoler une.
 - Les heures sont affichées telles qu'Uber les fournit (`*_local`), sans conversion de fuseau.
 - Poids (gzip) :

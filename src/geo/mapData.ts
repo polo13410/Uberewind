@@ -14,6 +14,8 @@ export interface Segment {
   from: [number, number];
   to: [number, number];
   city: string | null;
+  /** The trip itself, for the hover tooltip. */
+  trip: Trip;
 }
 
 export interface MapLayer {
@@ -88,6 +90,6 @@ export function tripSegments(trips: readonly Trip[], max = 3000): Segment[] {
   const ok = trips.filter((t) => t.status === 'completed' && t.pickup && t.dropoffAt);
   const step = Math.max(1, Math.ceil(ok.length / max));
   const out: Segment[] = [];
-  for (let i = 0; i < ok.length; i += step) out.push({ from: ok[i].pickup!, to: ok[i].dropoffAt!, city: ok[i].city });
+  for (let i = 0; i < ok.length; i += step) out.push({ from: ok[i].pickup!, to: ok[i].dropoffAt!, city: ok[i].city, trip: ok[i] });
   return out;
 }

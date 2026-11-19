@@ -257,22 +257,11 @@
 
 /* ---------- Trust row ---------- */
 .trust {
-  list-style: none;
-  padding: 0;
-  margin: 18px 0 0;
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px 22px;
+  max-width: 34rem;
+  margin: 18px auto 0;
   font-size: 14px;
+  line-height: 1.5;
   color: var(--mu);
-}
-
-.trust li,
-.trust a {
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
 }
 
 .trust a {
@@ -284,7 +273,7 @@
 .hero-steps {
   list-style: none;
   padding: 0;
-  margin: 56px 0 0;
+  margin: 0 0 24px;
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
   gap: 14px;
